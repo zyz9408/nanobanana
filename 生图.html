@@ -1,0 +1,2443 @@
+<!-- --- START OF FILE 生图_v4_stable.html --- -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano Banana Pro + Veo Studio (Ultimate Full)</title>
+    <style>
+        :root {
+            --bg: #09090b;
+            --panel: #18181b;
+            --input: #27272a;
+            --border: #3f3f46;
+            --text: #e4e4e7;
+            --accent: #F4B400;
+            --accent-hover: #dba100;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --overlay: rgba(0, 0, 0, 0.9);
+            --magic: #8b5cf6;
+            --veo: #3b82f6;
+            --veo-dark: #1e3a8a;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* --- 导航栏 --- */
+        .nav-tabs {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            background: var(--panel);
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: #888;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-btn.active.img-tab {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .nav-btn.active.video-tab {
+            background: var(--veo);
+            color: #fff;
+        }
+
+        /* --- 视图控制 --- */
+        .view-container {
+            width: 100%;
+            max-width: 1600px;
+            display: none;
+        }
+
+        .view-container.active {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 950px) {
+            .view-container.active {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* --- 面板样式 --- */
+        .panel {
+            background: var(--panel);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            height: fit-content;
+        }
+
+        h2,
+        h3 {
+            margin: 0;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            background: #333;
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: var(--accent);
+            border: 1px solid #444;
+        }
+
+        .badge-veo {
+            color: var(--veo);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #a1a1aa;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            background: var(--input);
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        .video-mode input:focus,
+        .video-mode textarea:focus,
+        .video-mode select:focus {
+            border-color: var(--veo);
+        }
+
+        #prompt,
+        #videoPrompt,
+        #negativePrompt {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        #rmBgKey {
+            min-height: 80px;
+            resize: vertical;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .btn-mini {
+            background: #333;
+            color: #ccc;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-mini:hover {
+            background: #444;
+            color: #fff;
+            border-color: #666;
+        }
+
+        .prompt-tools {
+            display: flex;
+            gap: 8px;
+        }
+
+        .pill-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .pill-btn {
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            color: #ccc;
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pill-btn:hover {
+            border-color: var(--veo);
+            color: #fff;
+            background: #333;
+        }
+
+        .pill-btn.active {
+            background: var(--veo-dark);
+            border-color: var(--veo);
+            color: #fff;
+        }
+
+        /* --- 上传区域 --- */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(244, 180, 0, 0.05);
+        }
+
+        .video-mode .upload-zone:hover,
+        .video-mode .upload-zone.drag-over {
+            border-color: var(--veo);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .ref-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .ref-item {
+            aspect-ratio: 1;
+            background: #000;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid var(--border);
+        }
+
+        .ref-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .ref-del {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(0, 0, 0, 0.7);
+            color: var(--danger);
+            border: none;
+            cursor: pointer;
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        /* --- 按钮 --- */
+        #genBtn {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        #genBtn:hover {
+            opacity: 0.9;
+        }
+
+        #genBtn:active {
+            transform: scale(0.98);
+        }
+
+        #genBtn:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #genVideoBtn {
+            background: var(--veo);
+            color: #fff;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        #genVideoBtn:hover {
+            opacity: 0.9;
+        }
+
+        #genVideoBtn:active {
+            transform: scale(0.98);
+        }
+
+        #genVideoBtn:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* --- 结果面板 --- */
+        .result-panel {
+            background: #101012;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 600px;
+            position: relative;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        #resultImg,
+        #resultVideo {
+            max-width: 100%;
+            max-height: 85vh;
+            display: none;
+            border-radius: 8px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        #textOutput,
+        #videoTextOutput {
+            width: 100%;
+            max-width: 600px;
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--danger);
+            color: #ffaaaa;
+            font-family: monospace;
+            white-space: pre-wrap;
+            display: none;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #333;
+            border-bottom-color: var(--accent);
+            border-radius: 50%;
+            display: none;
+            animation: spin 1s linear infinite;
+        }
+
+        .video-loader {
+            border-bottom-color: var(--veo);
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .download-btn {
+            position: absolute;
+            bottom: 24px;
+            background: #2563eb;
+            color: #fff;
+            padding: 10px 24px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            transition: background 0.2s;
+        }
+
+        .download-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .download-btn.veo-dl {
+            background: var(--veo);
+        }
+
+        /* --- 相册 --- */
+        .gallery-container {
+            width: 100%;
+            max-width: 1600px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .gallery-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            width: 100%;
+        }
+
+        .gallery-card {
+            background: var(--panel);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: transform 0.2s;
+            position: relative;
+            aspect-ratio: 1;
+            cursor: pointer;
+            background-image: linear-gradient(45deg, #111 25%, transparent 25%), linear-gradient(-45deg, #111 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #111 75%), linear-gradient(-45deg, transparent 75%, #111 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .gallery-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--accent);
+        }
+
+        .gallery-card img,
+        .gallery-card video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .type-badge {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #fff;
+            z-index: 1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .badge-img {
+            background: rgba(244, 180, 0, 0.9);
+        }
+
+        .badge-vid {
+            background: rgba(59, 130, 246, 0.9);
+        }
+
+        .gallery-del {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            color: var(--danger);
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .gallery-card:hover .gallery-del {
+            display: flex;
+        }
+
+        .gallery-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            font-size: 10px;
+            padding: 4px 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .load-more-btn {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: none;
+        }
+
+        .load-more-btn:hover {
+            background: #333;
+            border-color: var(--accent);
+        }
+
+        /* --- 灯箱 --- */
+        .lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--overlay);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .lightbox-content {
+            background: var(--panel);
+            border-radius: 12px;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .lb-img-container {
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .lb-img-container img,
+        .lb-img-container video {
+            max-width: 70vw;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+
+        .lb-details {
+            width: 300px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid var(--border);
+            overflow-y: auto;
+        }
+
+        @media (max-width: 800px) {
+            .lightbox-content {
+                flex-direction: column;
+            }
+
+            .lb-img-container img,
+            .lb-img-container video {
+                max-width: 90vw;
+                max-height: 60vh;
+            }
+
+            .lb-details {
+                width: auto;
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
+        }
+
+        .lb-meta {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .lb-prompt {
+            background: var(--input);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #ddd;
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+        }
+
+        .lb-btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: auto;
+        }
+
+        .lb-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            min-width: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #fff;
+        }
+
+        .btn-magic {
+            background: var(--magic);
+            color: #fff;
+            transition: opacity 0.2s;
+        }
+
+        .btn-magic:hover {
+            opacity: 0.9;
+        }
+
+        .btn-magic:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+            opacity: 1;
+        }
+
+        .lb-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 30px;
+            color: #fff;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        /* --- 模版管理器弹窗 --- */
+        .tpl-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .tpl-item {
+            background: var(--input);
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .tpl-item:hover {
+            border-color: var(--accent);
+            background: #333;
+        }
+
+        .tpl-text {
+            font-size: 13px;
+            color: #ccc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 85%;
+        }
+
+        .tpl-title {
+            font-weight: bold;
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .tpl-del {
+            color: #666;
+            font-size: 16px;
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tpl-del:hover {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .tpl-badge {
+            font-size: 10px;
+            background: #444;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
+
+        .tpl-badge.custom {
+            background: var(--magic);
+            color: #fff;
+        }
+
+        .tpl-footer {
+            margin-top: 15px;
+            text-align: right;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .tpl-restore-btn {
+            color: #666;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 12px;
+            text-decoration: underline;
+        }
+
+        .tpl-restore-btn:hover {
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 导航切换 -->
+    <div class="nav-tabs">
+        <button class="nav-btn active img-tab" onclick="switchTab('image')">🍌 Nano Banana (生图)</button>
+        <button class="nav-btn video-tab" onclick="switchTab('video')">🎥 Veo 3.1 (视频)</button>
+    </div>
+
+    <!-- ================= 1. 生图页面 ================= -->
+    <div id="view-image" class="view-container active">
+        <!-- Left: Configuration -->
+        <div class="panel">
+            <h2>🍌 Nano Banana Pro <span class="badge">Gemini 3</span></h2>
+
+            <!-- ================= 全局 API 配置 ================= -->
+            <div class="row"
+                style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed var(--border);">
+                <div class="col">
+                    <label>API 模式 (Protocol)</label>
+                    <select id="apiProtocol" onchange="updateApiPlaceholders()">
+                        <option value="google" selected>Google 原生 (Native)</option>
+                        <option value="openai">OpenAI 代理 (Proxy)</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label>Base URL (可选)</label>
+                    <input type="text" id="apiBaseUrl" placeholder="默认: https://generativelanguage...">
+                </div>
+            </div>
+
+            <!-- API Key -->
+            <div>
+                <label id="apiKeyLabel">API Key (自动保存)</label>
+                <input type="password" id="apiKey" placeholder="输入 API Key...">
+            </div>
+
+            <div>
+                <div class="label-row" style="margin-bottom: 5px;">
+                    <label style="margin:0">Image Model</label>
+                    <button class="btn-mini" onclick="fetchModels('imageModelName')">🔄 读取模型</button>
+                </div>
+                <select id="imageModelName">
+                    <option value="gemini-3.1-flash-image-preview" selected>gemini-3.1-flash-image-preview</option>
+                    <option value="gemini-3-pro-image-preview">gemini-3-pro-image-preview</option>
+                </select>
+            </div>
+
+            <!-- PicWish API Keys -->
+            <div>
+                <div class="label-row">
+                    <label style="margin:0">佐糖/PicWish Keys (一行一个)</label>
+                    <button class="btn-mini" onclick="document.getElementById('keyFileInput').click()">📂 导入
+                        TXT</button>
+                </div>
+                <!-- Hidden File Input -->
+                <input type="file" id="keyFileInput" accept=".txt" style="display:none">
+                <!-- Textarea for keys -->
+                <textarea id="rmBgKey" placeholder="key1&#10;key2&#10;key3..." spellcheck="false"></textarea>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <label>分辨率</label>
+                    <select id="resolution">
+                        <option value="1K">1K (Standard)</option>
+                        <option value="2K" selected>2K (High Detail)</option>
+                        <option value="4K">4K (Ultra)</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label>画幅</label>
+                    <select id="aspectRatio">
+                        <option value="1:1">1:1 (Square)</option>
+                        <option value="3:4">3:4 (Portrait)</option>
+                        <option value="4:3">4:3 (Landscape)</option>
+                        <option value="9:16">9:16 (Story)</option>
+                        <option value="16:9">16:9 (Widescreen)</option>
+                        <option value="3:2">3:2 (Classic 35mm)</option>
+                        <option value="2:3">2:3 (Vertical 35mm)</option>
+                        <option value="4:5">4:5 (Instagram)</option>
+                        <option value="5:4">5:4</option>
+                        <option value="8:1">8:1 (Horizon)</option>
+                        <option value="21:9">21:9 (Cinematic)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 新增: 视觉风格与排版文字 -->
+            <div class="row" style="margin-bottom: 15px;">
+                <div class="col">
+                    <label>视觉风格 (Visual Style)</label>
+                    <select id="visualStyle">
+                        <option value="">(无预设 Default)</option>
+                        <option value="Photographic">📸 真实摄影 (Photographic)</option>
+                        <option value="Cinematic">🎥 电影感 (Cinematic)</option>
+                        <option value="Anime">🌸 动漫 (Anime)</option>
+                        <option value="Watercolor">🎨 水彩 (Watercolor)</option>
+                        <option value="Sketch">✏️ 素描 (Sketch)</option>
+                        <option value="Steampunk">⚙️ 蒸汽朋克 (Steampunk)</option>
+                        <option value="Cyberpunk">🌆 赛博朋克 (Cyberpunk)</option>
+                        <option value="3D Model">🧊 3D渲染 (3D Model)</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label>渲染文字 (Text to Render)</label>
+                    <input type="text" id="renderText" placeholder="希望图内包含的文字...">
+                </div>
+            </div>
+
+            <!-- 提示词部分增加工具栏 -->
+            <div>
+                <div class="label-row">
+                    <label>提示词</label>
+                    <div class="prompt-tools">
+                        <button class="btn-mini" onclick="openTemplateModal('image')">📚 提示词库</button>
+                        <button class="btn-mini" onclick="saveCurrentAsTemplate('image')">💾 存为模版</button>
+                    </div>
+                </div>
+                <textarea id="prompt" placeholder="描述画面..."></textarea>
+            </div>
+
+            <div>
+                <label>参考图 (Max 14) - 支持 Ctrl+V 粘贴</label>
+                <div class="upload-zone" id="dropArea">
+                    <p style="margin:0; color:#888; font-size:13px;">点击 / 拖拽 / 粘贴上传</p>
+                    <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+                </div>
+                <div class="ref-grid" id="refGrid"></div>
+                <button onclick="clearImages()"
+                    style="margin-top:5px; background:none; border:none; color:#666; cursor:pointer; width:100%; font-size:12px;">清空参考图</button>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button id="genBtn" onclick="generate()" style="flex: 2;">🚀 生成图片</button>
+                <button id="cancelBtn" onclick="cancelGeneration()"
+                    style="flex: 1; background: #3f3f46; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; display: none;">⏹️
+                    取消生成</button>
+            </div>
+            <div id="status" style="font-size:12px; color:#666; text-align:center; margin-top:5px;">Ready</div>
+        </div>
+
+        <!-- Right: Output -->
+        <div class="result-panel">
+            <div class="loader" id="loader"></div>
+            <div id="placeholder" style="color:#444;">图片将显示在这里</div>
+            <img id="resultImg" alt="Generated Content">
+            <div id="textOutput"></div>
+            <a id="downloadLink" class="download-btn" href="#" download>📥 下载原图</a>
+        </div>
+    </div>
+
+    <!-- ================= 2. 视频页面 (Veo 3.1) ================= -->
+    <div id="view-video" class="view-container">
+        <div class="panel video-mode" style="border-color: var(--veo);">
+            <h2>🎥 Veo Studio <span class="badge badge-veo">Veo 3.1</span></h2>
+
+            <div
+                style="font-size:12px; color:#888; background:#111; padding:8px; border-radius:6px; margin-bottom:10px;">
+                💡 API Key 与生图页面共用。支持 Veo 2.0 / 3.1 模型。
+            </div>
+
+            <!-- 模型选择：改为下拉菜单 -->
+            <div class="row">
+                <div class="col">
+                    <div class="label-row" style="margin-bottom: 5px;">
+                        <label style="margin:0">模型选型 (Model)</label>
+                        <button class="btn-mini" onclick="fetchModels('veoModelName')">🔄 读取模型</button>
+                    </div>
+                    <select id="veoModelName">
+                        <option value="veo-3.1-generate-preview">Veo 3.1 Preview (High Quality)</option>
+                        <option value="veo-3.1-fast-generate-preview" selected>Veo 3.1 Fast (Standard)</option>
+                        <option value="veo-2.0-generate-content-preview">Veo 2.0 (Legacy)</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label>随机种子 (Seed)</label>
+                    <input type="number" id="videoSeed" placeholder="-1 (Random)" value="-1">
+                </div>
+            </div>
+
+            <!-- 高级画幅 (移除 FPS) -->
+            <div class="row">
+                <div class="col">
+                    <label>视频画幅</label>
+                    <select id="veoAspectRatio">
+                        <option value="16:9" selected>16:9 (Landscape)</option>
+                        <option value="9:16">9:16 (Portrait)</option>
+                        <option value="1:1">1:1 (Square)</option>
+                        <option value="21:9">21:9 (Cinematic)</option>
+                        <option value="4:3">4:3 (Classic)</option>
+                    </select>
+                </div>
+                <!-- 空列占位，保持布局整齐 -->
+                <div class="col"></div>
+            </div>
+
+            <div>
+                <div class="label-row">
+                    <label>视频提示词 (Prompt)</label>
+                    <div class="prompt-tools">
+                        <button class="btn-mini" onclick="openTemplateModal('video')">📚 模版</button>
+                        <button class="btn-mini" onclick="saveCurrentAsTemplate('video')">💾 保存</button>
+                    </div>
+                </div>
+                <textarea id="videoPrompt"
+                    placeholder="描述视频内容 (英文效果更佳)...&#10;例如: A cinematic drone shot of a futuristic city at night."></textarea>
+
+                <!-- 快捷 Prompt 增强器 -->
+                <div class="pill-group" style="margin-top:5px;">
+                    <span style="font-size:10px; color:#666; display:flex; align-items:center;">镜头控制:</span>
+                    <button class="pill-btn" onclick="appendPrompt('Cinematic drone shot')">🚁 无人机</button>
+                    <button class="pill-btn" onclick="appendPrompt('Slow pan left')">⬅️ 左摇</button>
+                    <button class="pill-btn" onclick="appendPrompt('Slow pan right')">➡️ 右摇</button>
+                    <button class="pill-btn" onclick="appendPrompt('Zoom in slowly')">🔍 缓慢推镜</button>
+                    <button class="pill-btn" onclick="appendPrompt('Static camera')">📷 固定机位</button>
+                    <button class="pill-btn" onclick="appendPrompt('8k resolution, photorealistic, highly detailed')">✨
+                        4K画质增强</button>
+                </div>
+            </div>
+
+            <div>
+                <label>负向提示词 (Negative Prompt)</label>
+                <textarea id="negativePrompt" placeholder="不希望出现的元素..."
+                    style="min-height: 50px;">distorted, blurry, low quality, bad composition, shaky camera</textarea>
+            </div>
+
+            <!-- 视频参考图 -->
+            <div>
+                <label>视频参考图 (图生视频)</label>
+                <div class="upload-zone" id="videoDropArea">
+                    <p style="margin:0; color:#888; font-size:13px;">点击 / 拖拽 / 粘贴上传 (支持2张：起点与终点帧)</p>
+                    <input type="file" id="videoFileInput" multiple accept="image/*" style="display:none">
+                </div>
+                <div class="ref-grid" id="videoRefGrid"></div>
+                <button onclick="clearVideoImages()"
+                    style="margin-top:5px; background:none; border:none; color:#666; cursor:pointer; width:100%; font-size:12px;">清空参考图</button>
+            </div>
+
+            <button id="genVideoBtn" onclick="generateVideo()">🎬 生成视频 (Veo)</button>
+            <div id="videoStatus" style="font-size:12px; color:#666; text-align:center; margin-top:5px;">Ready</div>
+        </div>
+
+        <!-- Right: Video Output -->
+        <div class="result-panel">
+            <div class="loader video-loader" id="videoLoader"></div>
+            <div id="videoPlaceholder" style="color:#444;">
+                视频生成较慢 (约 2 分钟)<br>生成后将自动播放并保存到相册
+            </div>
+            <video id="resultVideo" controls autoplay loop style="max-width: 100%; display: none;"></video>
+            <div id="videoTextOutput"></div>
+            <a id="videoDownloadLink" class="download-btn veo-dl" href="#" download>📥 下载视频</a>
+        </div>
+    </div>
+
+    <!-- ================= 3. 相册 ================= -->
+    <div class="gallery-container">
+        <div class="gallery-header">
+            <h3>🖼️ 相册 (图片 & 视频)</h3>
+            <button onclick="clearGalleryDB()"
+                style="background:#333; color:#ef4444; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">🗑️
+                清空相册</button>
+        </div>
+        <div id="galleryGrid" class="gallery-grid">
+            <!-- Items will be injected here -->
+        </div>
+        <button id="loadMoreBtn" class="load-more-btn" onclick="loadNextPage()">📥 加载更多...</button>
+    </div>
+
+    <!-- Template Modal -->
+    <div id="templateModal" class="lightbox" onclick="closeTemplateModal(event)">
+        <div class="lightbox-content" onclick="event.stopPropagation()"
+            style="width: 500px; height: auto; max-height: 80vh; flex-direction: column;">
+            <div
+                style="padding: 20px; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; height: 100%;">
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-shrink: 0;">
+                    <h3 style="margin:0">📚 提示词模版库 <span id="tplTypeBadge" class="badge"></span></h3>
+                    <div class="lb-close" onclick="document.getElementById('templateModal').style.display='none'"
+                        style="position:static; font-size:24px;">&times;</div>
+                </div>
+
+                <input type="text" id="tplSearch" placeholder="🔍 搜索模版..." onkeyup="filterTemplates()"
+                    style="margin-bottom:10px; flex-shrink: 0;">
+
+                <div id="templateList" class="tpl-list">
+                    <!-- Templates injected via JS -->
+                </div>
+
+                <div class="tpl-footer" style="flex-shrink: 0;">
+                    <button class="tpl-restore-btn" onclick="restorePresets()">♻️ 恢复已删除的预设模版</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox" onclick="closeLightbox(event)">
+        <div class="lb-close" onclick="document.getElementById('lightbox').style.display='none'">&times;</div>
+        <div class="lightbox-content" onclick="event.stopPropagation()">
+            <div class="lb-img-container">
+                <!-- Image View -->
+                <img id="lbImg" src="" style="display:none;">
+                <!-- Video View -->
+                <video id="lbVideo" controls loop autoplay
+                    style="display:none; max-width:70vw; max-height:90vh;"></video>
+            </div>
+            <div class="lb-details">
+                <h3 style="margin-bottom:10px;">资源详情</h3>
+                <div class="lb-meta" id="lbMeta"></div>
+                <label>提示词</label>
+                <div class="lb-prompt" id="lbPrompt"></div>
+
+                <div class="lb-btn-group">
+                    <button class="lb-btn btn-secondary" onclick="copyPrompt()">📋 复制提示词</button>
+                    <button id="rmBgBtn" class="lb-btn btn-magic" onclick="runRemoveBg()">✂️ 一键抠图</button>
+                    <a id="lbDownload" class="lb-btn btn-primary" href="#"
+                        style="text-align:center; text-decoration:none; line-height:normal; display:flex; align-items:center; justify-content:center;"
+                        download>📥 下载</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image-preview";
+        const IMAGE_QUEUE_MAX = 3;
+        const MAX_IMAGES = 14;
+        const ITEMS_PER_PAGE = 12;
+
+        let refImages = [];
+        let videoRefImages = [];
+        let imageQueue = [];
+        let imageIsProcessing = false;
+        let currentLightboxImgId = null;
+        let bgKeyIndex = 0;
+        let imageAbortController = null;
+
+        function mapAspectRatioToProxySize(aspectRatio) {
+            if (!aspectRatio || aspectRatio === '1:1') return '1024x1024';
+
+            const [w, h] = aspectRatio.split(':').map(Number);
+            if (!w || !h) return '1024x1024';
+
+            if (w > h) return '1536x1024';
+            if (w < h) return '1024x1536';
+            return '1024x1024';
+        }
+
+        function buildProxyAspectRatioPrompt(prompt, aspectRatio) {
+            if (!aspectRatio || aspectRatio === '1:1') return prompt;
+            return `${prompt}\nAspect ratio requirement: ${aspectRatio}. Keep the final composition in this ratio.`;
+        }
+
+        function extractImageFromProxyResponse(data) {
+            const directImage = data?.data?.[0];
+            if (directImage?.b64_json) return `data:image/png;base64,${directImage.b64_json}`;
+            if (directImage?.url) return directImage.url;
+
+            const responseOutput = data?.output || [];
+            for (const item of responseOutput) {
+                if (item?.result) return `data:image/png;base64,${item.result}`;
+                if (item?.image_base64) return `data:image/png;base64,${item.image_base64}`;
+                const contents = item?.content || [];
+                for (const content of contents) {
+                    if (content?.b64_json) return `data:image/png;base64,${content.b64_json}`;
+                    if (content?.image_url?.url) return content.image_url.url;
+                }
+            }
+
+            const message = data?.choices?.[0]?.message;
+            if (typeof message?.content === 'string') {
+                const content = message.content.trim();
+                const dataUrlMatch = content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/);
+                if (dataUrlMatch) return dataUrlMatch[0];
+                const urlMatch = content.match(/https?:\/\/[^\s"'<()]+/);
+                if (urlMatch) return urlMatch[0];
+            }
+            if (message?.images?.[0]?.b64_json) {
+                return `data:image/png;base64,${message.images[0].b64_json}`;
+            }
+            if (message?.images?.[0]?.url) return message.images[0].url;
+
+            const messageContent = Array.isArray(message?.content) ? message.content : [];
+            for (const item of messageContent) {
+                if (item?.image_url?.url) return item.image_url.url;
+                if (item?.b64_json) return `data:image/png;base64,${item.b64_json}`;
+            }
+
+            return null;
+        }
+
+        function resolveImageModelForRequest(apiProtocol, selectedModel, resolution) {
+            if (apiProtocol !== 'openai') {
+                return selectedModel;
+            }
+
+            if (resolution === '2K') {
+                return 'gemini-3.1-flash-image-preview-2k';
+            }
+
+            if (resolution === '4K') {
+                return 'gemini-3.1-flash-image-preview-4k';
+            }
+
+            return selectedModel;
+        }
+
+        function cancelGeneration() {
+            imageQueue = [];
+            if (imageAbortController) {
+                imageAbortController.abort();
+                imageAbortController = null;
+            }
+            imageIsProcessing = false;
+            updateImageQueueButton();
+            updateImageQueueStatus("任务已取消", "#ef4444");
+            toggleUI('image', false);
+            document.getElementById('cancelBtn').style.display = 'none';
+
+            // Ensure buttons get reset
+            setTimeout(() => updateImageQueueButton(), 100);
+        }
+        let currentTemplateMode = 'image';
+        let lastCursorKey = null;
+
+        // ================= 预设模版数据 =================
+        const PRESET_TEMPLATES = {
+            image: [
+                { title: "Cyberpunk City", content: "Futuristic cyberpunk city street at night, neon lights reflecting on wet pavement, towering skyscrapers, holograms, high detail, 8k resolution, cinematic lighting." },
+                { title: "Ghibli Style", content: "Anime style, Studio Ghibli inspired, lush green meadow, blue sky with fluffy clouds, a small cottage in the distance, peaceful atmosphere, vibrant colors." },
+                { title: "Portrait Close-up", content: "Close-up portrait of a young woman with freckles, natural lighting, soft bokeh background, highly detailed skin texture, eyes in focus, 85mm lens photography." },
+                { title: "Macro Nature", content: "Macro photography of a dew drop on a spider web, morning light, intricate details, nature, bokeh background, high sharpness." },
+                { title: "Minimal Logo", content: "Minimalist vector logo design of a fox, flat colors, simple shapes, white background, professional vector art style." }
+            ],
+            video: [
+                { title: "Cinematic Drone", content: "Cinematic drone shot flying over a majestic mountain range at sunset, golden hour lighting, 4k resolution, smooth motion." },
+                { title: "Cyberpunk Street", content: "A camera tracking shot moving through a futuristic cyberpunk market, neon signs flickering, steam rising from vents, people walking, cinematic depth of field." },
+                { title: "Slow Motion Droplet", content: "Extreme close-up slow motion of a water droplet falling into a calm pool, creating ripples, high speed camera, pristine clarity." },
+                { title: "City Timelapse", content: "Time-lapse of a busy city intersection at night, car trails creating streaks of light, fast moving clouds above, urban energy." }
+            ]
+        };
+
+        // --- Tab Switching ---
+        function switchTab(mode) {
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(`view-${mode}`).classList.add('active');
+            const btnClass = mode === 'image' ? '.img-tab' : '.video-tab';
+            document.querySelector(btnClass).classList.add('active');
+        }
+
+        // --- API Key Auto-Save & File Import ---
+        const apiKeyInput = document.getElementById('apiKey');
+        const imageModelInput = document.getElementById('imageModelName');
+        const rmBgKeyInput = document.getElementById('rmBgKey');
+        const keyFileInput = document.getElementById('keyFileInput');
+        const veoModelInput = document.getElementById('veoModelName');
+
+        const apiProtocolInput = document.getElementById('apiProtocol');
+        const apiBaseUrlInput = document.getElementById('apiBaseUrl');
+        const apiKeyLabel = document.getElementById('apiKeyLabel');
+
+        function updateApiPlaceholders() {
+            const mode = apiProtocolInput.value;
+            if (mode === 'openai') {
+                apiBaseUrlInput.placeholder = "例: https://api.yourproxy.com";
+                apiKeyLabel.innerText = "API Key (Bearer)";
+            } else {
+                apiBaseUrlInput.placeholder = "默认: https://generativelanguage...";
+                apiKeyLabel.innerText = "Google API Key (自动保存)";
+            }
+        }
+
+        window.addEventListener('load', () => {
+            const savedProtocol = localStorage.getItem("api_protocol");
+            if (savedProtocol) apiProtocolInput.value = savedProtocol;
+
+            const savedBaseUrl = localStorage.getItem("api_base_url");
+            if (savedBaseUrl) apiBaseUrlInput.value = savedBaseUrl;
+
+            updateApiPlaceholders();
+
+            const savedKey = localStorage.getItem("gemini_api_key");
+            if (savedKey) apiKeyInput.value = savedKey;
+
+            const savedRmKey = localStorage.getItem("picwish_api_key");
+            if (savedRmKey) rmBgKeyInput.value = savedRmKey;
+
+            const savedImageModel = localStorage.getItem("image_model_id");
+            if (savedImageModel) {
+                const exists = Array.from(imageModelInput.options).some(o => o.value === savedImageModel);
+                if (exists) imageModelInput.value = savedImageModel;
+            } else {
+                imageModelInput.value = DEFAULT_IMAGE_MODEL;
+            }
+
+            // Restore last selected model
+            const savedVeoModel = localStorage.getItem("veo_model_id");
+            if (savedVeoModel) {
+                // Check if value exists in dropdown (legacy protection)
+                const exists = Array.from(veoModelInput.options).some(o => o.value === savedVeoModel);
+                if (exists) veoModelInput.value = savedVeoModel;
+            }
+
+            updateImageQueueButton();
+            updateImageQueueStatus("Ready", "#666");
+            initDB();
+        });
+
+        apiProtocolInput.addEventListener('change', (e) => {
+            localStorage.setItem("api_protocol", e.target.value);
+            updateApiPlaceholders();
+        });
+        apiBaseUrlInput.addEventListener('input', (e) => localStorage.setItem("api_base_url", e.target.value.trim()));
+        apiKeyInput.addEventListener('input', (e) => localStorage.setItem("gemini_api_key", e.target.value.trim()));
+        imageModelInput.addEventListener('change', (e) => localStorage.setItem("image_model_id", e.target.value.trim()));
+        rmBgKeyInput.addEventListener('input', (e) => localStorage.setItem("picwish_api_key", e.target.value));
+        veoModelInput.addEventListener('change', (e) => localStorage.setItem("veo_model_id", e.target.value.trim()));
+
+        keyFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const content = event.target.result;
+                rmBgKeyInput.value = content;
+                localStorage.setItem("picwish_api_key", content);
+                keyFileInput.value = '';
+            };
+            reader.readAsText(file);
+        });
+
+        // --- Prompt Enhancer ---
+        function appendPrompt(text) {
+            const ta = document.getElementById('videoPrompt');
+            if (ta.value.length > 0) {
+                ta.value += ", " + text;
+            } else {
+                ta.value = text;
+            }
+        }
+
+        // ================= Template Management =================
+
+        function getStoredTemplates(mode) {
+            const key = `nano_templates_${mode}`;
+            const stored = localStorage.getItem(key);
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveStoredTemplates(mode, templates) {
+            localStorage.setItem(`nano_templates_${mode}`, JSON.stringify(templates));
+        }
+
+        function getHiddenPresets(mode) {
+            const key = `nano_hidden_presets_${mode}`;
+            const stored = localStorage.getItem(key);
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveHiddenPresets(mode, list) {
+            localStorage.setItem(`nano_hidden_presets_${mode}`, JSON.stringify(list));
+        }
+
+        function openTemplateModal(mode) {
+            currentTemplateMode = mode;
+            const modal = document.getElementById('templateModal');
+            const badge = document.getElementById('tplTypeBadge');
+
+            badge.innerText = mode === 'image' ? 'Image' : 'Video';
+            badge.className = mode === 'image' ? 'badge' : 'badge badge-veo';
+
+            renderTemplateList();
+            modal.style.display = 'flex';
+            document.getElementById('tplSearch').value = '';
+            document.getElementById('tplSearch').focus();
+        }
+
+        function closeTemplateModal(e) {
+            if (e.target.id === 'templateModal' || e.target.classList.contains('lb-close')) {
+                document.getElementById('templateModal').style.display = 'none';
+            }
+        }
+
+        function renderTemplateList(filter = '') {
+            const list = document.getElementById('templateList');
+            list.innerHTML = '';
+
+            const customTemplates = getStoredTemplates(currentTemplateMode);
+            const presetTemplates = PRESET_TEMPLATES[currentTemplateMode] || [];
+            const hiddenPresets = getHiddenPresets(currentTemplateMode);
+
+            const activePresets = presetTemplates.filter(t => !hiddenPresets.includes(t.title));
+
+            const allTemplates = [
+                ...customTemplates.map((t, idx) => ({ ...t, type: 'custom', index: idx })),
+                ...activePresets.map((t, idx) => ({ ...t, type: 'preset', index: idx }))
+            ];
+
+            const filtered = allTemplates.filter(t =>
+                t.title.toLowerCase().includes(filter.toLowerCase()) ||
+                t.content.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<div style="color:#666; text-align:center; padding:20px;">No matching templates.</div>';
+                return;
+            }
+
+            filtered.forEach((tpl) => {
+                const isCustom = tpl.type === 'custom';
+                const div = document.createElement('div');
+                div.className = 'tpl-item';
+                div.innerHTML = `
+                <div style="flex:1; overflow:hidden;" onclick="applyTemplate('${escapeHtml(tpl.content)}')">
+                    <div class="tpl-title">
+                        <span class="tpl-badge ${isCustom ? 'custom' : ''}">${isCustom ? 'User' : 'Preset'}</span>
+                        ${tpl.title}
+                    </div>
+                    <div class="tpl-text">${tpl.content}</div>
+                </div>
+                <div class="tpl-del" title="${isCustom ? 'Delete permanently' : 'Hide preset'}"
+                     onclick="deleteItem('${tpl.type}', ${tpl.index}, '${escapeHtml(tpl.title)}', event)">
+                    X
+                </div>
+            `;
+                list.appendChild(div);
+            });
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+        }
+
+        function applyTemplate(content) {
+            const targetId = currentTemplateMode === 'image' ? 'prompt' : 'videoPrompt';
+            const textarea = document.getElementById(targetId);
+            textarea.value = content;
+            document.getElementById('templateModal').style.display = 'none';
+        }
+
+        function saveCurrentAsTemplate(mode) {
+            const targetId = mode === 'image' ? 'prompt' : 'videoPrompt';
+            const content = document.getElementById(targetId).value.trim();
+
+            if (!content) return alert("Input is empty, cannot save.");
+
+            const title = prompt("Name this template:", "My Awesome Prompt");
+            if (!title) return;
+
+            const templates = getStoredTemplates(mode);
+            templates.unshift({ title, content });
+            saveStoredTemplates(mode, templates);
+            alert("Template saved.");
+        }
+
+        function deleteItem(type, index, title, event) {
+            event.stopPropagation();
+
+            if (type === 'custom') {
+                if (!confirm(`Delete custom template \"${title}\"?`)) return;
+                const templates = getStoredTemplates(currentTemplateMode);
+                templates.splice(index, 1);
+                saveStoredTemplates(currentTemplateMode, templates);
+            } else {
+                if (!confirm(`Hide preset template \"${title}\"?\n(You can restore hidden presets at the bottom.)`)) return;
+                const hidden = getHiddenPresets(currentTemplateMode);
+                hidden.push(title);
+                saveHiddenPresets(currentTemplateMode, hidden);
+            }
+            renderTemplateList(document.getElementById('tplSearch').value);
+        }
+
+        function restorePresets() {
+            if (!confirm("Restore all hidden preset templates?")) return;
+            localStorage.removeItem(`nano_hidden_presets_${currentTemplateMode}`);
+            renderTemplateList(document.getElementById('tplSearch').value);
+            alert("Presets restored.");
+        }
+
+        function filterTemplates() {
+            const query = document.getElementById('tplSearch').value;
+            renderTemplateList(query);
+        }
+
+        // ================= IndexedDB (Optimized for Large Gallery) =================
+        let db;
+        const DB_NAME = "NanoBananaDB";
+        const DB_VERSION = 3;
+
+        function initDB() {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = (event) => {
+                console.error("DB Error:", event.target.errorCode);
+                document.getElementById('status').innerText = "Album feature unavailable";
+            };
+            request.onupgradeneeded = (event) => {
+                db = event.target.result;
+                if (!db.objectStoreNames.contains("images")) {
+                    db.createObjectStore("images", { keyPath: "id", autoIncrement: true });
+                }
+            };
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                reloadGallery(); // Initialize load
+            };
+        }
+
+        async function saveToGallery(data, promptText, resolution, type = "image") {
+            if (!db) return;
+            try {
+                // BEST PRACTICE: Store as Blob to prevent out-of-memory crashes
+                let blobData = data;
+                if (typeof data === 'string' && data.startsWith('data:')) {
+                    const fetchRes = await fetch(data);
+                    blobData = await fetchRes.blob();
+                }
+
+                const transaction = db.transaction(["images"], "readwrite");
+                const store = transaction.objectStore("images");
+                const item = {
+                    data: blobData,
+                    prompt: promptText,
+                    resolution: resolution || "Processed",
+                    type: type,
+                    date: new Date().toLocaleString()
+                };
+                store.add(item);
+                transaction.oncomplete = () => {
+                    reloadGallery();
+                };
+            } catch (err) {
+                console.error("Save Gallery Error:", err);
+            }
+        }
+
+        // 重置并重新加载相册
+        function reloadGallery() {
+            const grid = document.getElementById('galleryGrid');
+            grid.innerHTML = '';
+            lastCursorKey = null; // 重置游标
+            loadNextPage();
+        }
+
+        // 分页加载核心逻辑
+        function loadNextPage() {
+            if (!db) return;
+            const grid = document.getElementById('galleryGrid');
+            const loadBtn = document.getElementById('loadMoreBtn');
+            let count = 0;
+
+            const transaction = db.transaction(["images"], "readonly");
+            const store = transaction.objectStore("images");
+
+            let range = null;
+            if (lastCursorKey !== null) {
+                range = IDBKeyRange.upperBound(lastCursorKey, true);
+            }
+
+            const request = store.openCursor(range, 'prev');
+
+            request.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor && count < ITEMS_PER_PAGE) {
+                    const { id, data, prompt, date, type } = cursor.value;
+
+                    let srcUrl = data;
+                    if (data instanceof Blob) {
+                        srcUrl = URL.createObjectURL(data);
+                    }
+
+                    createGalleryItem(id, srcUrl, prompt, date, type, grid);
+
+                    lastCursorKey = id;
+                    count++;
+                    cursor.continue();
+                } else {
+                    if (cursor) {
+                        loadBtn.style.display = 'block';
+                    } else {
+                        loadBtn.style.display = 'none';
+                    }
+                }
+            };
+        }
+
+        function createGalleryItem(id, data, prompt, date, type, container) {
+            const isVideo = type === 'video';
+            const card = document.createElement('div');
+            card.className = 'gallery-card';
+            card.onclick = () => openLightbox(id, data, prompt, date, type);
+
+            let contentHtml = '';
+            if (isVideo) {
+                contentHtml = `
+                <span class="type-badge badge-vid">VIDEO</span>
+                <video src="${data}" muted loop onmouseover="this.play()" onmouseout="this.pause()" preload="metadata"></video>
+            `;
+            } else {
+                contentHtml = `
+                <span class="type-badge badge-img">IMG</span>
+                <img src="${data}" loading="lazy">
+            `;
+            }
+
+            card.innerHTML = `
+            ${contentHtml}
+            <button class="gallery-del" onclick="deleteGalleryItem(${id}, event)">×</button>
+            <div class="gallery-info">${date.split(' ')[0]}</div>
+        `;
+            container.appendChild(card);
+        }
+
+        function deleteGalleryItem(id, e) {
+            e.stopPropagation();
+            if (!confirm("确定删除此项吗？")) return;
+            const transaction = db.transaction(["images"], "readwrite");
+            transaction.objectStore("images").delete(id);
+            transaction.oncomplete = () => reloadGallery();
+        }
+
+        function clearGalleryDB() {
+            if (!db) return;
+            if (!confirm("⚠️ 确定清空所有相册记录吗？\n此操作不可恢复！")) return;
+            try {
+                const transaction = db.transaction(["images"], "readwrite");
+                transaction.objectStore("images").clear().onsuccess = () => {
+                    document.getElementById('galleryGrid').innerHTML = '';
+                    document.getElementById('loadMoreBtn').style.display = 'none';
+                };
+            } catch (err) {
+                alert("执行出错: " + err.message);
+            }
+        }
+
+        // --- Lightbox Logic ---
+        function openLightbox(id, src, prompt, date, type) {
+            currentLightboxImgId = id;
+            const lbImg = document.getElementById('lbImg');
+            const lbVideo = document.getElementById('lbVideo');
+            const rmBtn = document.getElementById('rmBgBtn');
+
+            if (type === 'video') {
+                lbImg.style.display = 'none';
+                lbVideo.style.display = 'block';
+                lbVideo.src = src;
+                rmBtn.style.display = 'none';
+            } else {
+                lbVideo.style.display = 'none';
+                lbVideo.pause();
+                lbImg.style.display = 'block';
+                lbImg.src = src;
+                rmBtn.style.display = 'block';
+                rmBtn.disabled = false;
+                rmBtn.innerText = "Remove Background";
+            }
+
+            document.getElementById('lbPrompt').innerText = prompt || "(无提示词)";
+            document.getElementById('lbMeta').innerText = `生成时间: ${date}`;
+
+            const dlBtn = document.getElementById('lbDownload');
+            dlBtn.onclick = (e) => {
+                e.preventDefault();
+                downloadFile(src, `file-${Date.now()}.${type === 'video' ? 'mp4' : 'png'}`);
+            };
+
+
+            document.getElementById('lightbox').style.display = 'flex';
+        }
+
+        function closeLightbox(e) {
+            if (e.target.id === 'lightbox' || e.target.classList.contains('lb-close')) {
+                document.getElementById('lightbox').style.display = 'none';
+                document.getElementById('lbVideo').pause();
+            }
+        }
+
+        function copyPrompt() {
+            navigator.clipboard.writeText(document.getElementById('lbPrompt').innerText)
+                .then(() => alert("Prompt copied."));
+        }
+
+        // ================= Remove Background (PicWish) =================
+        async function runRemoveBg() {
+            const rawKeys = document.getElementById('rmBgKey').value.trim();
+            const imgElement = document.getElementById('lbImg');
+            const rmBtn = document.getElementById('rmBgBtn');
+            const currentPrompt = document.getElementById('lbPrompt').innerText;
+
+            if (!rawKeys) return alert("请先输入 PicWish API Keys");
+
+            const keyList = rawKeys.split(/[\r\n]+/).map(k => k.trim()).filter(k => k.length > 0);
+            if (keyList.length === 0) return alert("未检测到有效 API Key");
+
+            rmBtn.disabled = true;
+            rmBtn.innerText = "⌛ 抠图中...";
+
+            try {
+                const fetchImg = await fetch(imgElement.src);
+                const blob = await fetchImg.blob();
+
+                let resultUrl = null;
+                let lastError = "";
+
+                // Loop through keys if one hits an error or runs out of credits
+                for (let i = 0; i < keyList.length; i++) {
+                    const currentKey = keyList[(bgKeyIndex + i) % keyList.length];
+
+                    const formData = new FormData();
+                    formData.append('image_file', blob, 'source.png');
+                    formData.append('sync', '1');
+                    formData.append('format', 'png');
+                    formData.append('output_type', '2');
+
+                    const response = await fetch("https://techsz.aoscdn.com/api/tasks/visual/segmentation", {
+                        method: "POST",
+                        headers: { "X-API-KEY": currentKey },
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 200 && data.data && data.data.image) {
+                        resultUrl = data.data.image;
+                        bgKeyIndex = (bgKeyIndex + i + 1) % keyList.length; // Save rotation
+                        break;
+                    } else {
+                        lastError = data.message || "Unknown API Error";
+                        console.log(`Key fallback... failed with: ${lastError}`);
+                    }
+                }
+
+                if (resultUrl) {
+                    const resImgFetch = await fetch(resultUrl);
+                    const resBlob = await resImgFetch.blob();
+                    const reader = new FileReader();
+
+                    reader.onloadend = () => {
+                        const base64data = reader.result;
+                        imgElement.src = base64data;
+                        document.getElementById('lbDownload').href = base64data;
+                        saveToGallery(base64data, currentPrompt + " [已抠图]", "Transparent", "image");
+                        rmBtn.innerText = "✅ 完成";
+                    };
+                    reader.readAsDataURL(resBlob);
+                } else {
+                    throw new Error(lastError || "所有 Key 均已失效");
+                }
+            } catch (error) {
+                alert("抠图失败: " + error.message);
+                rmBtn.innerText = "❌ 失败";
+                rmBtn.disabled = false;
+            }
+        }
+
+        // --- Upload & Image Gen Logic ---
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const refGrid = document.getElementById('refGrid');
+
+        // Video Upload Elements
+        const videoDropArea = document.getElementById('videoDropArea');
+        const videoFileInput = document.getElementById('videoFileInput');
+        const videoRefGrid = document.getElementById('videoRefGrid');
+
+        // Image Tab Listeners
+        dropArea.addEventListener('click', () => fileInput.click());
+        dropArea.addEventListener('dragover', (e) => { e.preventDefault(); dropArea.classList.add('drag-over'); });
+        dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag-over'));
+        dropArea.addEventListener('drop', (e) => { e.preventDefault(); dropArea.classList.remove('drag-over'); processFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => processFiles(e.target.files));
+
+        // Video Tab Listeners
+        videoDropArea.addEventListener('click', () => videoFileInput.click());
+        videoDropArea.addEventListener('dragover', (e) => { e.preventDefault(); videoDropArea.classList.add('drag-over'); });
+        videoDropArea.addEventListener('dragleave', () => videoDropArea.classList.remove('drag-over'));
+        videoDropArea.addEventListener('drop', (e) => { e.preventDefault(); videoDropArea.classList.remove('drag-over'); processVideoFiles(e.dataTransfer.files); });
+        videoFileInput.addEventListener('change', (e) => processVideoFiles(e.target.files));
+
+        // Paste handling
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            const files = [];
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    files.push(items[i].getAsFile());
+                }
+            }
+            if (files.length > 0) {
+                if (document.getElementById('view-image').classList.contains('active')) {
+                    processFiles(files);
+                } else if (document.getElementById('view-video').classList.contains('active')) {
+                    processVideoFiles(files);
+                }
+            }
+        });
+
+        // --- Image Processing Functions ---
+        function processFiles(files) {
+            if (refImages.length + files.length > MAX_IMAGES) return alert(`Max ${MAX_IMAGES} images.`);
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const full = e.target.result;
+                    refImages.push({
+                        mimeType: full.split(';')[0].split(':')[1],
+                        data: full.split(',')[1],
+                        display: full
+                    });
+                    renderRefs();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderRefs() {
+            refGrid.innerHTML = '';
+            refImages.forEach((img, idx) => {
+                refGrid.innerHTML += `<div class="ref-item"><img src="${img.display}"><button class="ref-del" onclick="removeImg(${idx}, event)">×</button></div>`;
+            });
+        }
+        function removeImg(i, e) { e.stopPropagation(); refImages.splice(i, 1); renderRefs(); }
+        function clearImages() { refImages = []; renderRefs(); }
+
+        // --- Video Reference Processing Functions ---
+        function processVideoFiles(files) {
+            if (videoRefImages.length + files.length > 2) return alert("Veo 视频生成最高支持 2 张参考图(首尾帧)");
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const full = e.target.result;
+                    videoRefImages.push({
+                        mimeType: full.split(';')[0].split(':')[1],
+                        data: full.split(',')[1],
+                        display: full
+                    });
+                    renderVideoRefs();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderVideoRefs() {
+            videoRefGrid.innerHTML = '';
+            videoRefImages.forEach((img, idx) => {
+                const label = idx === 0 ? "起" : "终";
+                videoRefGrid.innerHTML += `<div class="ref-item">
+                    <div style="position: absolute; top: 0; left: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; padding: 2px 4px; border-bottom-right-radius: 4px; z-index: 1;">${label}</div>
+                    <img src="${img.display}">
+                    <button class="ref-del" onclick="removeVideoImg(${idx}, event)">×</button>
+                </div>`;
+            });
+        }
+        function removeVideoImg(i, e) { e.stopPropagation(); videoRefImages.splice(i, 1); renderVideoRefs(); }
+        function clearVideoImages() { videoRefImages = []; renderVideoRefs(); }
+
+        function getImageQueueLoad() {
+            return imageQueue.length + (imageIsProcessing ? 1 : 0);
+        }
+
+        function updateImageQueueButton() {
+            const genBtn = document.getElementById('genBtn');
+            const queueLoad = getImageQueueLoad();
+
+            genBtn.disabled = queueLoad >= IMAGE_QUEUE_MAX;
+
+            if (queueLoad >= IMAGE_QUEUE_MAX) {
+                genBtn.innerText = `队列已满 (${queueLoad}/${IMAGE_QUEUE_MAX})`;
+                return;
+            }
+
+            if (imageIsProcessing) {
+                genBtn.innerText = `加入队列 (${queueLoad}/${IMAGE_QUEUE_MAX})`;
+                return;
+            }
+
+            genBtn.innerText = "🚀 生成图片";
+        }
+
+        function updateImageQueueStatus(text, color = "#666") {
+            const status = document.getElementById('status');
+            status.innerText = text;
+            status.style.color = color;
+        }
+
+        async function processImageQueue() {
+            if (imageIsProcessing || imageQueue.length === 0) {
+                updateImageQueueButton();
+                return;
+            }
+
+            const task = imageQueue.shift();
+            imageIsProcessing = true;
+            updateImageQueueButton();
+            await runImageGenerationTask(task);
+            imageIsProcessing = false;
+            updateImageQueueButton();
+
+            if (imageQueue.length > 0) {
+                processImageQueue();
+            }
+        }
+
+        async function runImageGenerationTask(task) {
+            const { apiKey, prompt, resolution, aspectRatio, model, refs } = task;
+
+            toggleUI('image', true);
+            document.getElementById('cancelBtn').style.display = 'block';
+            updateImageQueueStatus("Thinking & Generating...", "#666");
+
+            const apiProtocol = document.getElementById('apiProtocol').value;
+            const requestModel = resolveImageModelForRequest(apiProtocol, model, resolution);
+            let apiBaseUrl = document.getElementById('apiBaseUrl').value.trim();
+
+            try {
+                imageAbortController = new AbortController();
+                let finalBase64 = null;
+
+                if (apiProtocol === 'openai') {
+                    if (!apiBaseUrl) apiBaseUrl = "https://api.openai.com";
+                    apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
+
+                    const promptWithAspect = buildProxyAspectRatioPrompt(prompt, aspectRatio);
+                    let proxyError = "";
+
+                    const payload = {
+                        model: requestModel,
+                        prompt: promptWithAspect,
+                        n: 1,
+                        response_format: "url",
+                        aspect_ratio: aspectRatio
+                    };
+
+                    if (refs.length > 0) {
+                        payload.image = refs.map(img => `data:${img.mimeType};base64,${img.data}`);
+                    }
+
+                    const response = await fetch(`${apiBaseUrl}/v1/images/generations`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify(payload),
+                        signal: imageAbortController.signal
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error?.message || proxyError || response.status);
+                    }
+
+                    const data = await response.json();
+                    finalBase64 = extractImageFromProxyResponse(data);
+
+                    if (!finalBase64) {
+                        throw new Error(proxyError || "Empty response from proxy image endpoint");
+                    }
+                } else {
+                    const parts = [];
+                    if (prompt) parts.push({ text: prompt });
+                    refs.forEach(img => parts.push({ inline_data: { mime_type: img.mimeType, data: img.data } }));
+
+                    const payload = {
+                        systemInstruction: {
+                            parts: [{ text: "You are a specialized image generation AI. Output ONLY the generated image." }]
+                        },
+                        contents: [{ parts: parts }],
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                        ],
+                        generationConfig: {
+                            responseModalities: ["IMAGE", "TEXT"],
+                            imageConfig: { aspectRatio: aspectRatio, imageSize: resolution }
+                        }
+                    };
+
+                    let baseUrl = apiBaseUrl || "https://generativelanguage.googleapis.com";
+                    baseUrl = baseUrl.replace(/\/+$/, '');
+
+                    const response = await fetch(`${baseUrl}/v1beta/models/${requestModel}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        signal: imageAbortController.signal
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json();
+                        throw new Error(err.error?.message || response.status);
+                    }
+
+                    const data = await response.json();
+                    const candidate = data.candidates?.[0];
+
+                    if (candidate?.finishReason === 'SAFETY') throw new Error("Blocked by Safety Filter");
+                    if (!candidate?.content?.parts) throw new Error("Empty response");
+
+                    for (const part of candidate.content.parts) {
+                        if (part.inlineData) finalBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                    }
+                }
+
+                if (finalBase64) {
+                    const resultImg = document.getElementById('resultImg');
+                    const dlLink = document.getElementById('downloadLink');
+
+                    resultImg.src = finalBase64;
+                    resultImg.style.display = 'block';
+                    updateImageQueueStatus("Success", "#22c55e");
+
+                    saveToGallery(finalBase64, prompt, resolution, "image");
+
+                    dlLink.onclick = (e) => {
+                        e.preventDefault();
+                        downloadFile(finalBase64, `gemini-${Date.now()}.png`);
+                    };
+                    dlLink.style.display = 'block';
+                } else {
+                    throw new Error("Model returned text only.");
+                }
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                showError('image', e.message);
+            } finally {
+                if (imageQueue.length === 0) {
+                    document.getElementById('cancelBtn').style.display = 'none';
+                }
+                toggleUI('image', false);
+            }
+        }
+
+        // --- Generate Image (with queue, max 3) ---
+        async function generate() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            let prompt = document.getElementById('prompt').value.trim();
+            const resolution = document.getElementById('resolution').value;
+            const aspectRatio = document.getElementById('aspectRatio').value;
+            const model = document.getElementById('imageModelName').value.trim() || DEFAULT_IMAGE_MODEL;
+            const visualStyle = document.getElementById('visualStyle').value;
+            const renderText = document.getElementById('renderText').value.trim();
+
+            if (!apiKey) return alert("Please enter Google API Key");
+            if (!prompt && refImages.length === 0) return alert("Please enter prompt text");
+
+            if (visualStyle) prompt = `[Style: ${visualStyle}] ` + prompt;
+            if (renderText) prompt += `\nThe image MUST contain the precise text: "${renderText}"`;
+
+            if (getImageQueueLoad() >= IMAGE_QUEUE_MAX) {
+                return alert(`Queue full. Max tasks: ${IMAGE_QUEUE_MAX}`);
+            }
+
+            imageQueue.push({
+                apiKey,
+                prompt,
+                resolution,
+                aspectRatio,
+                model,
+                refs: refImages.map(img => ({ mimeType: img.mimeType, data: img.data }))
+            });
+
+            updateImageQueueButton();
+
+            if (imageIsProcessing) {
+                updateImageQueueStatus("Added to queue", "#666");
+            } else {
+                updateImageQueueStatus("Task submitted", "#666");
+            }
+
+            processImageQueue();
+        }
+        // ================= Veo 视频生成 (FPS Removed) =================
+        async function generateVideo() {
+            const apiKey = apiKeyInput.value.trim();
+            const prompt = document.getElementById('videoPrompt').value.trim();
+            const negPrompt = document.getElementById('negativePrompt').value.trim();
+            const model = document.getElementById('veoModelName').value.trim();
+            const aspectRatio = document.getElementById('veoAspectRatio').value;
+            const seedVal = document.getElementById('videoSeed').value;
+            // FPS logic removed
+
+            const apiProtocol = document.getElementById('apiProtocol').value;
+            let apiBaseUrl = document.getElementById('apiBaseUrl').value.trim();
+
+            if (!apiKey) return alert("请在生图/配置页面填写 API Key");
+            if (!prompt) return alert("请填写视频提示词");
+
+            toggleUI('video', true);
+            const status = document.getElementById('videoStatus');
+
+            try {
+                status.innerText = "正在提交任务...";
+
+                if (apiProtocol === 'openai') {
+                    if (!apiBaseUrl) apiBaseUrl = "https://api.openai.com";
+                    apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
+
+                    const payload = {
+                        model: model,
+                        messages: [
+                            { role: "system", content: "You are a video generation assistant. You must quickly return the final generated video URL if available." },
+                            { role: "user", content: prompt }
+                        ]
+                    };
+
+                    const response = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error?.message || response.status);
+                    }
+
+                    const data = await response.json();
+                    const content = data.choices?.[0]?.message?.content;
+
+                    if (!content) throw new Error("Empty response from OpenAI endpoint");
+
+                    // Try parsing URL from markdown or plaintext
+                    const urlMatch = content.match(/https?:\/\/[^\s"'<()]+/);
+                    if (urlMatch) {
+                        status.innerText = "生成完成，下载中...";
+                        await displayVideo(urlMatch[0], apiKey, prompt);
+                    } else {
+                        // Output the text straight to the screen if it wasn't a URL
+                        throw new Error(`Proxy replied text instead of Direct URL:\n${content.substring(0, 100)}...`);
+                    }
+                } else {
+                    let baseUrl = apiBaseUrl || "https://generativelanguage.googleapis.com";
+                    baseUrl = baseUrl.replace(/\/+$/, '');
+                    const url = `${baseUrl}/v1beta/models/${model}:predictLongRunning?key=${apiKey}`;
+
+                    // 构建 Instance 对象
+                    const instance = { prompt: prompt };
+
+                    // 使用 bytesBase64Encoded (Veo标准)
+                    if (videoRefImages.length > 0) {
+                        instance.image = {
+                            bytesBase64Encoded: videoRefImages[0].data,
+                            mimeType: videoRefImages[0].mimeType
+                        };
+                    }
+                    if (videoRefImages.length > 1) {
+                        instance.lastFrame = {
+                            bytesBase64Encoded: videoRefImages[1].data,
+                            mimeType: videoRefImages[1].mimeType
+                        };
+                    }
+
+                    // 构建 Parameters 对象
+                    const parameters = {
+                        aspectRatio: aspectRatio,
+                        negativePrompt: negPrompt || undefined
+                    };
+
+                    if (seedVal && parseInt(seedVal) !== -1) {
+                        parameters.seed = parseInt(seedVal);
+                    }
+
+                    parameters.sampleCount = 1;
+
+                    const payload = {
+                        instances: [instance],
+                        parameters: parameters
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.error) throw new Error(data.error.message);
+                    if (!data.name) throw new Error("未返回 operation name");
+
+                    status.innerText = "生成中 (任务已提交，轮询状态中)...";
+                    await pollOperation(data.name, apiKey, prompt, baseUrl);
+                }
+
+            } catch (e) {
+                showError('video', e.message);
+                toggleUI('video', false);
+            }
+        }
+
+        async function pollOperation(operationName, apiKey, prompt, baseUrl = "https://generativelanguage.googleapis.com") {
+            const status = document.getElementById('videoStatus');
+            const poll = async () => {
+                try {
+                    const pollUrl = `${baseUrl}/v1beta/${operationName}?key=${apiKey}`;
+                    const res = await fetch(pollUrl);
+                    const data = await res.json();
+
+                    if (data.error) throw new Error(data.error.message);
+
+                    if (data.done) {
+                        const samples = data.response?.generateVideoResponse?.generatedSamples;
+                        if (samples && samples.length > 0 && samples[0].video && samples[0].video.uri) {
+                            status.innerText = "生成完成，下载中...";
+                            await displayVideo(samples[0].video.uri, apiKey, prompt, 'google');
+                        } else {
+                            throw new Error("任务完成但未找到视频数据");
+                        }
+                    } else {
+                        status.innerText = `生成中.. (${new Date().toLocaleTimeString()})`;
+                        setTimeout(poll, 5000);
+                    }
+                } catch (e) {
+                    showError('video', e.message);
+                    toggleUI('video', false);
+                }
+            };
+            setTimeout(poll, 5000);
+        }
+
+        async function displayVideo(uri, apiKey, prompt, protocol = 'google') {
+            const videoEl = document.getElementById('resultVideo');
+            const dlLink = document.getElementById('videoDownloadLink');
+            const status = document.getElementById('videoStatus');
+
+            try {
+                const fetchOpts = {};
+                if (protocol === 'google') {
+                    fetchOpts.headers = { 'x-goog-api-key': apiKey };
+                }
+
+                const res = await fetch(uri, fetchOpts);
+                if (!res.ok) throw new Error(`视频下载失败 HTTP ${res.status}`);
+
+                const blob = await res.blob();
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const base64Data = reader.result;
+                    videoEl.src = base64Data;
+                    videoEl.style.display = 'block';
+
+                    dlLink.onclick = (e) => {
+                        e.preventDefault();
+                        downloadFile(base64Data, `veo-video-${Date.now()}.mp4`);
+                    };
+                    dlLink.style.display = 'block';
+                    saveToGallery(base64Data, prompt, "720p", "video");
+                    status.innerText = "✅ 视频就绪";
+                    status.style.color = "#22c55e";
+                    toggleUI('video', false);
+                };
+                reader.readAsDataURL(blob);
+            } catch (e) {
+                showError('video', "无法下载: " + e.message);
+                toggleUI('video', false);
+            }
+        }
+
+        // --- UI Helpers ---
+        async function downloadFile(url, filename) {
+            try {
+                // If it's already a data: or blob: URL, downloading might still fail cross-origin/local.
+                // Fetching as blob is safer for "download" attribute recognition.
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                console.warn("Download shim failed, falling back to direct link:", e);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.target = "_blank";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+
+        function toggleUI(mode, isLoading) {
+            const loader = document.getElementById(mode === 'image' ? 'loader' : 'videoLoader');
+            const ph = document.getElementById(mode === 'image' ? 'placeholder' : 'videoPlaceholder');
+            const btn = document.getElementById(mode === 'image' ? 'genBtn' : 'genVideoBtn');
+            const res = document.getElementById(mode === 'image' ? 'resultImg' : 'resultVideo');
+            const dl = document.getElementById(mode === 'image' ? 'downloadLink' : 'videoDownloadLink');
+            const txt = document.getElementById(mode === 'image' ? 'textOutput' : 'videoTextOutput');
+
+            if (mode === 'image') {
+                updateImageQueueButton();
+            } else {
+                btn.disabled = isLoading;
+            }
+            loader.style.display = isLoading ? 'block' : 'none';
+            ph.style.display = isLoading ? 'none' : 'block';
+
+            if (isLoading) {
+                res.style.display = 'none';
+                dl.style.display = 'none';
+                txt.style.display = 'none';
+                if (mode === 'video') res.src = "";
+            }
+        }
+
+        function normalizeApiErrorMessage(msg) {
+            const raw = String(msg || '').trim();
+            const lower = raw.toLowerCase();
+            const apiProtocol = document.getElementById('apiProtocol')?.value || 'google';
+
+            if (lower.includes('consumer') && lower.includes('api_key') && lower.includes('suspended')) {
+                if (apiProtocol === 'openai') {
+                    return "第三方 API Key 已被上游服务暂停或封禁，当前请求被拒绝。请更换可用 Key，或联系代理服务商处理。原始信息: " + raw;
+                }
+                return "当前 Google API Key 或其所属项目已被暂停/停用，接口拒绝访问。请更换可用 Key，或到 Google Cloud 检查项目状态、Generative Language API 是否启用，以及账单/风控状态。原始信息: " + raw;
+            }
+
+            if (lower.includes('permission denied')) {
+                return apiProtocol === 'openai'
+                    ? "第三方 API 返回权限不足。请检查代理 Key、账户状态和模型访问权限。原始信息: " + raw
+                    : "Google 原生 API 返回权限不足。请检查 API Key、项目权限、接口启用状态和账单状态。原始信息: " + raw;
+            }
+
+            return raw;
+        }
+
+        function showError(mode, msg) {
+            const t = document.getElementById(mode === 'image' ? 'textOutput' : 'videoTextOutput');
+            t.innerText = "Error: " + normalizeApiErrorMessage(msg);
+            t.style.display = 'block';
+            document.getElementById(mode === 'image' ? 'status' : 'videoStatus').innerText = "失败";
+            document.getElementById(mode === 'image' ? 'status' : 'videoStatus').style.color = "#ef4444";
+        }
+
+        async function fetchModels(targetId) {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const apiProtocol = document.getElementById('apiProtocol').value;
+            let apiBaseUrl = document.getElementById('apiBaseUrl').value.trim();
+            const selectEl = document.getElementById(targetId);
+
+            if (!apiKey) return alert("请先填写 API Key");
+
+            const originalValue = selectEl.value;
+            selectEl.innerHTML = '<option value="">正在获取...</option>';
+            selectEl.disabled = true;
+
+            try {
+                let models = [];
+                if (apiProtocol === 'openai') {
+                    if (!apiBaseUrl) apiBaseUrl = "https://api.openai.com";
+                    apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
+                    const res = await fetch(`${apiBaseUrl}/v1/models`, {
+                        headers: { 'Authorization': `Bearer ${apiKey}` }
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    if (data.data) {
+                        // Some platforms return lots of models, maybe filter relevant ones?
+                        // But best to let user see all
+                        models = data.data.map(m => m.id);
+                    }
+                } else {
+                    let baseUrl = apiBaseUrl || "https://generativelanguage.googleapis.com";
+                    baseUrl = baseUrl.replace(/\/+$/, '');
+                    const res = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    if (data.models) {
+                        models = data.models.map(m => m.name.replace('models/', ''));
+                    }
+                }
+
+                if (models.length === 0) throw new Error("获取到的模型列表为空");
+
+                // 只展示有 'image' 字样的生图模型
+                if (targetId === 'imageModelName') {
+                    models = models.filter(m => m.toLowerCase().includes('image'));
+                    if (models.length === 0) throw new Error("未找到包含 'image' 的可用模型");
+                }
+
+                selectEl.innerHTML = '';
+                models.forEach(modelId => {
+                    const opt = document.createElement('option');
+                    opt.value = modelId;
+                    opt.innerText = modelId;
+                    selectEl.appendChild(opt);
+                });
+
+                if (models.includes(originalValue)) {
+                    selectEl.value = originalValue;
+                } else {
+                    selectEl.selectedIndex = 0;
+                }
+            } catch (e) {
+                alert("获取模型失败: " + e.message);
+                selectEl.innerHTML = `<option value="${originalValue}">${originalValue}</option>`;
+            } finally {
+                selectEl.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>
+<!-- --- END OF FILE --- -->
