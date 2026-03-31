@@ -1661,6 +1661,13 @@
         }
 
         // --- Lightbox Logic ---
+        function updateLightboxDownloadSource(src, type) {
+            const dlBtn = document.getElementById('lbDownload');
+            dlBtn.dataset.src = src || '';
+            dlBtn.dataset.type = type || 'image';
+            dlBtn.href = '#';
+        }
+
         function openLightbox(id, src, prompt, date, type) {
             currentLightboxImgId = id;
             const lbImg = document.getElementById('lbImg');
@@ -1686,9 +1693,12 @@
             document.getElementById('lbMeta').innerText = `生成时间: ${date}`;
 
             const dlBtn = document.getElementById('lbDownload');
+            updateLightboxDownloadSource(src, type);
             dlBtn.onclick = (e) => {
                 e.preventDefault();
-                downloadFile(src, `file-${Date.now()}.${type === 'video' ? 'mp4' : 'png'}`);
+                const currentSrc = dlBtn.dataset.src || src;
+                const currentType = dlBtn.dataset.type || type;
+                downloadFile(currentSrc, `file-${Date.now()}.${currentType === 'video' ? 'mp4' : 'png'}`);
             };
 
 
@@ -1765,7 +1775,7 @@
                     reader.onloadend = () => {
                         const base64data = reader.result;
                         imgElement.src = base64data;
-                        document.getElementById('lbDownload').href = base64data;
+                        updateLightboxDownloadSource(base64data, 'image');
                         saveToGallery(base64data, currentPrompt + " [已抠图]", "Transparent", "image");
                         rmBtn.innerText = "✅ 完成";
                     };
