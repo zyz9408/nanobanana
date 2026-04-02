@@ -1,0 +1,206 @@
+diff --git a/index.html b/index.html
+index a9fc214..054b631 100644
+--- a/index.html
++++ b/index.html
+@@ -983,20 +983,29 @@
+ 
+             <div
+                 style="font-size:12px; color:#888; background:#111; padding:8px; border-radius:6px; margin-bottom:10px;">
+-                💡 API Key 与生图页面共用。支持 Veo 2.0 / 3.1 模型。
++                💡 API Key 与生图页面共用。Google 原生模式使用 Veo 原生 API，第三方代理模式使用 /v2/videos/generations 接口。
+             </div>
+ 
+-            <!-- 模型选择：改为下拉菜单 -->
++            <!-- 模型选择 -->
+             <div class="row">
+                 <div class="col">
+                     <div class="label-row" style="margin-bottom: 5px;">
+                         <label style="margin:0">模型选型 (Model)</label>
+                         <button class="btn-mini" onclick="fetchModels('veoModelName')">🔄 读取模型</button>
+                     </div>
+-                    <select id="veoModelName">
+-                        <option value="veo-3.1-generate-preview">Veo 3.1 Preview (High Quality)</option>
+-                        <option value="veo-3.1-fast-generate-preview" selected>Veo 3.1 Fast (Standard)</option>
+-                        <option value="veo-2.0-generate-content-preview">Veo 2.0 (Legacy)</option>
++                    <select id="veoModelName" onchange="onVeoModelChange()">
++                        <optgroup label="── 第三方代理 (OpenAI 模式) ──">
++                            <option value="veo3.1-fast" selected>veo3.1-fast 💰0.2/次 (快速，性价比最高)</option>
++                            <option value="veo3.1">veo3.1 💰0.3/次 (快速，支持首尾帧)</option>
++                            <option value="veo3.1-components">veo3.1-components 💰0.3/次 (多图融合 1-3张)</option>
++                            <option value="veo3.1-pro">veo3.1-pro 💰1/次 (高质量，支持首尾帧)</option>
++                            <option value="veo3.1-pro-4k">veo3.1-pro-4k 💰2/次 (4K超高质量)</option>
++                        </optgroup>
++                        <optgroup label="── Google 原生 API ──">
++                            <option value="veo-3.1-generate-preview">Veo 3.1 Preview (High Quality)</option>
++                            <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast (Standard)</option>
++                            <option value="veo-2.0-generate-content-preview">Veo 2.0 (Legacy)</option>
++                        </optgroup>
+                     </select>
+                 </div>
+                 <div class="col">
+@@ -1005,20 +1014,28 @@
+                 </div>
+             </div>
+ 
+-            <!-- 高级画幅 (移除 FPS) -->
++            <!-- 模型说明 -->
++            <div id="veoModelInfo" style="font-size:11px; color:#888; background:rgba(59,130,246,0.08); padding:8px 10px; border-radius:6px; border-left:3px solid var(--veo); line-height:1.5;">
++                veo3.1-fast: Google最新Veo3.1快速模式，支持视频自动配套音频生成，性价比最高
++            </div>
++
++            <!-- 画幅 + 提示词增强 -->
+             <div class="row">
+                 <div class="col">
+                     <label>视频画幅</label>
+                     <select id="veoAspectRatio">
+-                        <option value="16:9" selected>16:9 (Landscape)</option>
++                        <option value="">自动 (Auto)</option>
++                        <option value="16:9">16:9 (Landscape)</option>
+                         <option value="9:16">9:16 (Portrait)</option>
+-                        <option value="1:1">1:1 (Square)</option>
+-                        <option value="21:9">21:9 (Cinematic)</option>
+-                        <option value="4:3">4:3 (Classic)</option>
+                     </select>
+                 </div>
+-                <!-- 空列占位，保持布局整齐 -->
+-                <div class="col"></div>
++                <div class="col">
++                    <label>提示词优化</label>
++                    <select id="enhancePrompt">
++                        <option value="false" selected>关闭 (默认)</option>
++                        <option value="true">开启 (中文自动转英文)</option>
++                    </select>
++                </div>
+             </div>
+ 
+             <div>
+@@ -1045,17 +1062,20 @@
+                 </div>
+             </div>
+ 
+-            <div>
+-                <label>负向提示词 (Negative Prompt)</label>
++            <div id="negativePromptSection">
++                <label>负向提示词 (Negative Prompt) <span style="font-size:10px;color:#666;">仅 Google 原生模式</span></label>
+                 <textarea id="negativePrompt" placeholder="不希望出现的元素..."
+                     style="min-height: 50px;">distorted, blurry, low quality, bad composition, shaky camera</textarea>
+             </div>
+ 
+             <!-- 视频参考图 -->
+             <div>
+-                <label>视频参考图 (图生视频)</label>
++                <label id="videoRefLabel">参考图 / 图生视频 (首尾帧)</label>
++                <div id="videoRefHint" style="font-size:11px; color:#777; margin-bottom:6px;">
++                    当前模型: 无需参考图（纯文生视频），也可上传首尾帧
++                </div>
+                 <div class="upload-zone" id="videoDropArea">
+-                    <p style="margin:0; color:#888; font-size:13px;">点击 / 拖拽 / 粘贴上传 (支持2张：起点与终点帧)</p>
++                    <p style="margin:0; color:#888; font-size:13px;">点击 / 拖拽 / 粘贴上传参考图</p>
+                     <input type="file" id="videoFileInput" multiple accept="image/*" style="display:none">
+                 </div>
+                 <div class="ref-grid" id="videoRefGrid"></div>
+@@ -1329,6 +1349,9 @@
+                 if (exists) veoModelInput.value = savedVeoModel;
+             }
+ 
++            // Initialize Veo model UI state
++            onVeoModelChange();
++
+             updateImageQueueButton();
+             updateImageQueueStatus("Ready", "#666");
+             initDB();
+@@ -1859,9 +1882,75 @@
+         function removeImg(i, e) { e.stopPropagation(); refImages.splice(i, 1); renderRefs(); }
+         function clearImages() { refImages = []; renderRefs(); }
+ 
++        // --- Veo Model Info & Limits ---
++        const VEO_MODEL_INFO = {
++            'veo3.1-fast': { maxImages: 0, desc: 'Google最新Veo3.1快速模式，支持视频自动配套音频生成，性价比最高', price: '0.2', isThirdParty: true },
++            'veo3.1': { maxImages: 2, desc: 'Veo3.1快速模式，支持视频自动配套音频生成，支持首尾帧，性价比最高', price: '0.3', isThirdParty: true },
++            'veo3.1-components': { maxImages: 3, desc: 'Veo3.1快速模式，支持视频自动配套音频生成，支持多图融合参考(1-3张)', price: '0.3', isThirdParty: true },
++            'veo3.1-pro': { maxImages: 2, desc: 'Veo3.1高质量模式，支持视频自动配套音频生成，支持首尾帧，质量超高', price: '1', isThirdParty: true },
++            'veo3.1-pro-4k': { maxImages: 0, desc: 'Veo3.1 4K模式，支持视频自动配套音频生成，质量超高，价格也超高', price: '2', isThirdParty: true },
++        };
++
++        function getVeoModelMaxImages(model) {
++            const info = VEO_MODEL_INFO[model];
++            if (info) return info.maxImages;
++            return 2; // Default for Google native models
++        }
++
++        function isThirdPartyVeoModel(model) {
++            const info = VEO_MODEL_INFO[model];
++            return info ? info.isThirdParty : false;
++        }
++
++        function onVeoModelChange() {
++            const model = document.getElementById('veoModelName').value;
++            const info = VEO_MODEL_INFO[model];
++            const infoEl = document.getElementById('veoModelInfo');
++            const hintEl = document.getElementById('videoRefHint');
++            const negSection = document.getElementById('negativePromptSection');
++            const maxImg = getVeoModelMaxImages(model);
++
++            // Update model info description
++            if (info) {
++                infoEl.innerHTML = `<strong>${model}</strong> 💰${info.price}/次 — ${info.desc}`;
++                infoEl.style.display = 'block';
++            } else {
++                infoEl.innerHTML = `Google 原生模型: ${model}`;
++                infoEl.style.display = 'block';
++            }
++
++            // Update reference image hint
++            if (maxImg === 0) {
++                hintEl.innerText = '当前模型: 纯文生视频，不支持参考图';
++            } else if (model === 'veo3.1-components') {
++                hintEl.innerText = `当前模型: 支持 1~${maxImg} 张参考图 (多图融合，图片为视频中的元素)`;
++            } else {
++                hintEl.innerText = `当前模型: 支持 1~${maxImg} 张参考图 (首帧${maxImg > 1 ? '+尾帧' : ''})`;
++            }
++
++            // Show/hide negative prompt (only for Google native)
++            if (isThirdPartyVeoModel(model)) {
++                negSection.style.display = 'none';
++            } else {
++                negSection.style.display = 'block';
++            }
++
++            // Trim excess images if exceeds new model's limit
++            if (maxImg === 0 && videoRefImages.length > 0) {
++                videoRefImages = [];
++                renderVideoRefs();
++            } else if (videoRefImages.length > maxImg && maxImg > 0) {
++                videoRefImages = videoRefImages.slice(0, maxImg);
++                renderVideoRefs();
++            }
++        }
++
+         // --- Video Reference Processing Functions ---
+         function processVideoFiles(files) {
+-            if (videoRefImages.length + files.length > 2) return alert("Veo 视频生成最高支持 2 张参考图(首尾帧)");
++            const model = document.getElementById('veoModelName').value;
++            const maxImg = getVeoModelMaxImages(model);
++            if (maxImg === 0) return alert(`当前模型 ${model} 不支持参考图（纯文生视频）`);
++            if (videoRefImages.length + files.length > maxImg) return alert(`当前模型最多支持 ${maxImg} 张参考图`);
+             Array.from(files).forEach(file => {
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+@@ -1878,9 +1967,16 @@
+         }
+ 
+         function renderVideoRefs() {
++            const model = document.getElementById('veoModelName').value;
++            const isComponents = (model === 'veo3.1-components');
+             videoRefGrid.innerHTML = '';
+             videoRefImages.forEach((img, idx) => {
+-                const label = idx === 0 ? "起" : "终";
++                let label;
++                if (isComponents) {
++                    label = `素材${idx + 1}`;
++                } else {
++                    label = idx === 0 ? "首帧" : "尾帧";
++                }
+                 videoRefGrid.innerHTML += `<div class="ref-item">
+                     <div style="position: absolute; top: 0; left: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; padding: 2px 4px; border-bottom-right-radius: 4px; z-index: 1;">${label}</div>
+                     <img src="${img.display}">

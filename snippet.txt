@@ -1,0 +1,288 @@
+                    const data = await response.json();
+                    const candidate = data.candidates?.[0];
+
+                    if (candidate?.finishReason === 'SAFETY') throw new Error("Blocked by Safety Filter");
+                    if (!candidate?.content?.parts) throw new Error("Empty response");
+
+                    for (const part of candidate.content.parts) {
+                        if (part.inlineData) finalBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                    }
+                }
+
+                if (finalBase64) {
+                    const resultImg = document.getElementById('resultImg');
+                    const dlLink = document.getElementById('downloadLink');
+
+                    resultImg.src = finalBase64;
+                    resultImg.style.display = 'block';
+                    updateImageQueueStatus("Success", "#22c55e");
+
+                    saveToGallery(finalBase64, prompt, resolution, "image");
+
+                    dlLink.onclick = (e) => {
+                        e.preventDefault();
+                        downloadFile(finalBase64, `gemini-${Date.now()}.png`);
+                    };
+                    dlLink.style.display = 'block';
+                } else {
+                    throw new Error("Model returned text only.");
+                }
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                showError('image', e.message);
+            } finally {
+                if (imageQueue.length === 0) {
+                    document.getElementById('cancelBtn').style.display = 'none';
+                }
+                toggleUI('image', false);
+            }
+        }
+
+        // --- Generate Image (with queue, max 3) ---
+        async function generate() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            let prompt = document.getElementById('prompt').value.trim();
+            const resolution = document.getElementById('resolution').value;
+            const aspectRatio = document.getElementById('aspectRatio').value;
+            const model = document.getElementById('imageModelName').value.trim() || DEFAULT_IMAGE_MODEL;
+            const visualStyle = document.getElementById('visualStyle').value;
+            const renderText = document.getElementById('renderText').value.trim();
+
+            if (!apiKey) return alert("Please enter Google API Key");
+            if (!prompt && refImages.length === 0) return alert("Please enter prompt text");
+
+            if (visualStyle) prompt = `[Style: ${visualStyle}] ` + prompt;
+            if (renderText) prompt += `\nThe image MUST contain the precise text: "${renderText}"`;
+
+            if (getImageQueueLoad() >= IMAGE_QUEUE_MAX) {
+                return alert(`Queue full. Max tasks: ${IMAGE_QUEUE_MAX}`);
+            }
+
+            imageQueue.push({
+                apiKey,
+                prompt,
+                resolution,
+                aspectRatio,
+                model,
+                refs: refImages.map(img => ({ mimeType: img.mimeType, data: img.data }))
+            });
+
+            updateImageQueueButton();
+
+            if (imageIsProcessing) {
+                updateImageQueueStatus("Added to queue", "#666");
+            } else {
+                updateImageQueueStatus("Task submitted", "#666");
+            }
+
+            processImageQueue();
+        }
+
+        // ================= Veo 视频生成 =================
+        async function generateVideo() {
+            const apiKey = apiKeyInput.value.trim();
+            const prompt = document.getElementById('videoPrompt').value.trim();
+            const negPrompt = document.getElementById('negativePrompt').value.trim();
+            const model = document.getElementById('veoModelName').value.trim();
+            const aspectRatio = document.getElementById('veoAspectRatio').value;
+            const seedVal = document.getElementById('videoSeed').value;
+            const enhancePrompt = document.getElementById('enhancePrompt').value === 'true';
+
+            const apiProtocol = document.getElementById('apiProtocol').value;
+            let apiBaseUrl = document.getElementById('apiBaseUrl').value.trim();
+
+            if (!apiKey) return alert("请在生图/配置页面填写 API Key");
+            if (!prompt) return alert("请填写视频提示词");
+
+            toggleUI('video', true);
+            const status = document.getElementById('videoStatus');
+
+            try {
+                status.innerText = "正在提交任务...";
+
+                // Determine if using third-party Veo API or Google native
+                const useThirdPartyApi = isThirdPartyVeoModel(model) || apiProtocol === 'openai';
+
+                if (useThirdPartyApi) {
+                    if (!apiBaseUrl) apiBaseUrl = "https://api.openai.com";
+                    apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
+
+                    // Build payload per /v2/videos/generations spec
+                    const payload = {
+                        prompt: prompt,
+                        model: model,
+                        enhance_prompt: enhancePrompt
+                    };
+
+                    // Add aspect_ratio only if specified
+                    if (aspectRatio) {
+                        payload.aspect_ratio = aspectRatio;
+                    }
+
+                    // Add images (as data URLs or base64)
+                    if (videoRefImages.length > 0) {
+                        payload.images = videoRefImages.map(img => `data:${img.mimeType};base64,${img.data}`);
+                    } else {
+                        payload.images = [];
+                    }
+
+                    status.innerText = `正在生成 (${model})... 请耐心等待`;
+
+                    const response = await fetch(`${apiBaseUrl}/v2/videos/generations`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error?.message || err.message || `HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    // Try to find video URL in the response
+                    let videoUrl = null;
+
+                    // Common response formats:
+                    if (data?.data?.[0]?.url) {
+                        videoUrl = data.data[0].url;
+                    } else if (data?.url) {
+                        videoUrl = data.url;
+                    } else if (data?.video_url) {
+                        videoUrl = data.video_url;
+                    } else if (data?.result?.url) {
+                        videoUrl = data.result.url;
+                    } else if (data?.output?.video_url) {
+                        videoUrl = data.output.video_url;
+                    } else if (data?.data?.output) {
+                        videoUrl = data.data.output;
+                    } else {
+                        // Try finding URL in any string value
+                        const jsonStr = JSON.stringify(data);
+                        const urlMatch = jsonStr.match(/https?:\/\/[^\s"'<>\\]+\.mp4[^\s"'<>\\]*/i)
+                            || jsonStr.match(/https?:\/\/[^\s"'<>\\]+/);
+                        if (urlMatch) {
+                            videoUrl = urlMatch[0];
+                        }
+                    }
+
+                    if (videoUrl) {
+                        status.innerText = "生成完成，下载中...";
+                        await displayVideo(videoUrl, apiKey, prompt, 'proxy');
+                    } else {
+                        // Maybe it's an async task, check for task_id
+                        if (data?.task_id || data?.id) {
+                            const taskId = data.task_id || data.id;
+                            status.innerText = `任务已提交 (ID: ${taskId})，轮询中...`;
+                            await pollThirdPartyTask(apiBaseUrl, apiKey, taskId, prompt);
+                        } else {
+                            throw new Error(`无法解析视频响应:\n${JSON.stringify(data).substring(0, 300)}`);
+                        }
+                    }
+                } else {
+                    // Google Native API path
+                    let baseUrl = apiBaseUrl || "https://generativelanguage.googleapis.com";
+                    baseUrl = baseUrl.replace(/\/+$/, '');
+                    const url = `${baseUrl}/v1beta/models/${model}:predictLongRunning?key=${apiKey}`;
+
+                    const instance = { prompt: prompt };
+
+                    if (videoRefImages.length > 0) {
+                        instance.image = {
+                            bytesBase64Encoded: videoRefImages[0].data,
+                            mimeType: videoRefImages[0].mimeType
+                        };
+                    }
+                    if (videoRefImages.length > 1) {
+                        instance.lastFrame = {
+                            bytesBase64Encoded: videoRefImages[1].data,
+                            mimeType: videoRefImages[1].mimeType
+                        };
+                    }
+
+                    const parameters = {
+                        aspectRatio: aspectRatio || '16:9',
+                        negativePrompt: negPrompt || undefined
+                    };
+
+                    if (seedVal && parseInt(seedVal) !== -1) {
+                        parameters.seed = parseInt(seedVal);
+                    }
+                    parameters.sampleCount = 1;
+
+                    const payload = {
+                        instances: [instance],
+                        parameters: parameters
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.error) throw new Error(data.error.message);
+                    if (!data.name) throw new Error("未返回 operation name");
+
+                    status.innerText = "生成中 (任务已提交，轮询状态中)...";
+                    await pollOperation(data.name, apiKey, prompt, baseUrl);
+                }
+
+            } catch (e) {
+                showError('video', e.message);
+                toggleUI('video', false);
+            }
+        }
+
+        // Poll third-party async task
+        async function pollThirdPartyTask(baseUrl, apiKey, taskId, prompt) {
+            const status = document.getElementById('videoStatus');
+            const maxAttempts = 120; // ~10 minutes at 5s intervals
+            let attempts = 0;
+
+            const poll = async () => {
+                attempts++;
+                try {
+                    const res = await fetch(`${baseUrl}/v2/videos/generations/${taskId}`, {
+                        headers: { 'Authorization': `Bearer ${apiKey}` }
+                    });
+                    const data = await res.json();
+
+                    if (data.error) throw new Error(data.error.message || data.error);
+
+                    const taskStatus = (data.status || data.state || '').toLowerCase();
+
+                    if (taskStatus === 'completed' || taskStatus === 'success' || taskStatus === 'done') {
+                        let videoUrl = data?.data?.[0]?.url || data?.url || data?.video_url || data?.result?.url || data?.output?.video_url || data?.data?.output;
+                        if (!videoUrl) {
+                            const jsonStr = JSON.stringify(data);
+                            const urlMatch = jsonStr.match(/https?:\/\/[^\s"'<>\\]+/);
+                            if (urlMatch) videoUrl = urlMatch[0];
+                        }
+                        if (videoUrl) {
+                            status.innerText = "生成完成，下载中...";
+                            await displayVideo(videoUrl, apiKey, prompt, 'proxy');
+                        } else {
+                            throw new Error('任务完成但未找到视频URL');
+                        }
+                    } else if (taskStatus === 'failed' || taskStatus === 'error') {
+                        throw new Error(data.message || data.error || '视频生成失败');
+                    } else if (attempts >= maxAttempts) {
+                        throw new Error('轮询超时，请稍后刷新查看');
+                    } else {
+                        status.innerText = `生成中... (${new Date().toLocaleTimeString()}) [${attempts}/${maxAttempts}]`;
+                        setTimeout(poll, 5000);
+                    }
+                } catch (e) {
+                    showError('video', e.message);
+                    toggleUI('video', false);
+                }
+            };
+            setTimeout(poll, 5000);
+        }

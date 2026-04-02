@@ -1,0 +1,475 @@
+diff --git a/index.html b/index.html
+index a9fc214..054b631 100644
+--- a/index.html
++++ b/index.html
+@@ -983,20 +983,29 @@
+ 
+             <div
+                 style="font-size:12px; color:#888; background:#111; padding:8px; border-radius:6px; margin-bottom:10px;">
+-                💡 API Key 与生图页面共用。支持 Veo 2.0 / 3.1 模型。
++                💡 API Key 与生图页面共用。Google 原生模式使用 Veo 原生 API，第三方代理模式使用 /v2/videos/generations 接口。
+             </div>
+ 
+-            <!-- 模型选择：改为下拉菜单 -->
++            <!-- 模型选择 -->
+             <div class="row">
+                 <div class="col">
+                     <div class="label-row" style="margin-bottom: 5px;">
+                         <label style="margin:0">模型选型 (Model)</label>
+                         <button class="btn-mini" onclick="fetchModels('veoModelName')">🔄 读取模型</button>
+                     </div>
+-                    <select id="veoModelName">
+-                        <option value="veo-3.1-generate-preview">Veo 3.1 Preview (High Quality)</option>
+-                        <option value="veo-3.1-fast-generate-preview" selected>Veo 3.1 Fast (Standard)</option>
+-                        <option value="veo-2.0-generate-content-preview">Veo 2.0 (Legacy)</option>
++                    <select id="veoModelName" onchange="onVeoModelChange()">
++                        <optgroup label="── 第三方代理 (OpenAI 模式) ──">
++                            <option value="veo3.1-fast" selected>veo3.1-fast 💰0.2/次 (快速，性价比最高)</option>
++                            <option value="veo3.1">veo3.1 💰0.3/次 (快速，支持首尾帧)</option>
++                            <option value="veo3.1-components">veo3.1-components 💰0.3/次 (多图融合 1-3张)</option>
++                            <option value="veo3.1-pro">veo3.1-pro 💰1/次 (高质量，支持首尾帧)</option>
++                            <option value="veo3.1-pro-4k">veo3.1-pro-4k 💰2/次 (4K超高质量)</option>
++                        </optgroup>
++                        <optgroup label="── Google 原生 API ──">
++                            <option value="veo-3.1-generate-preview">Veo 3.1 Preview (High Quality)</option>
++                            <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast (Standard)</option>
++                            <option value="veo-2.0-generate-content-preview">Veo 2.0 (Legacy)</option>
++                        </optgroup>
+                     </select>
+                 </div>
+                 <div class="col">
+@@ -1005,20 +1014,28 @@
+                 </div>
+             </div>
+ 
+-            <!-- 高级画幅 (移除 FPS) -->
++            <!-- 模型说明 -->
++            <div id="veoModelInfo" style="font-size:11px; color:#888; background:rgba(59,130,246,0.08); padding:8px 10px; border-radius:6px; border-left:3px solid var(--veo); line-height:1.5;">
++                veo3.1-fast: Google最新Veo3.1快速模式，支持视频自动配套音频生成，性价比最高
++            </div>
++
++            <!-- 画幅 + 提示词增强 -->
+             <div class="row">
+                 <div class="col">
+                     <label>视频画幅</label>
+                     <select id="veoAspectRatio">
+-                        <option value="16:9" selected>16:9 (Landscape)</option>
++                        <option value="">自动 (Auto)</option>
++                        <option value="16:9">16:9 (Landscape)</option>
+                         <option value="9:16">9:16 (Portrait)</option>
+-                        <option value="1:1">1:1 (Square)</option>
+-                        <option value="21:9">21:9 (Cinematic)</option>
+-                        <option value="4:3">4:3 (Classic)</option>
+                     </select>
+                 </div>
+-                <!-- 空列占位，保持布局整齐 -->
+-                <div class="col"></div>
++                <div class="col">
++                    <label>提示词优化</label>
++                    <select id="enhancePrompt">
++                        <option value="false" selected>关闭 (默认)</option>
++                        <option value="true">开启 (中文自动转英文)</option>
++                    </select>
++                </div>
+             </div>
+ 
+             <div>
+@@ -1045,17 +1062,20 @@
+                 </div>
+             </div>
+ 
+-            <div>
+-                <label>负向提示词 (Negative Prompt)</label>
++            <div id="negativePromptSection">
++                <label>负向提示词 (Negative Prompt) <span style="font-size:10px;color:#666;">仅 Google 原生模式</span></label>
+                 <textarea id="negativePrompt" placeholder="不希望出现的元素..."
+                     style="min-height: 50px;">distorted, blurry, low quality, bad composition, shaky camera</textarea>
+             </div>
+ 
+             <!-- 视频参考图 -->
+             <div>
+-                <label>视频参考图 (图生视频)</label>
++                <label id="videoRefLabel">参考图 / 图生视频 (首尾帧)</label>
++                <div id="videoRefHint" style="font-size:11px; color:#777; margin-bottom:6px;">
++                    当前模型: 无需参考图（纯文生视频），也可上传首尾帧
++                </div>
+                 <div class="upload-zone" id="videoDropArea">
+-                    <p style="margin:0; color:#888; font-size:13px;">点击 / 拖拽 / 粘贴上传 (支持2张：起点与终点帧)</p>
++                    <p style="margin:0; color:#888; font-size:13px;">点击 / 拖拽 / 粘贴上传参考图</p>
+                     <input type="file" id="videoFileInput" multiple accept="image/*" style="display:none">
+                 </div>
+                 <div class="ref-grid" id="videoRefGrid"></div>
+@@ -1329,6 +1349,9 @@
+                 if (exists) veoModelInput.value = savedVeoModel;
+             }
+ 
++            // Initialize Veo model UI state
++            onVeoModelChange();
++
+             updateImageQueueButton();
+             updateImageQueueStatus("Ready", "#666");
+             initDB();
+@@ -1859,9 +1882,75 @@
+         function removeImg(i, e) { e.stopPropagation(); refImages.splice(i, 1); renderRefs(); }
+         function clearImages() { refImages = []; renderRefs(); }
+ 
++        // --- Veo Model Info & Limits ---
++        const VEO_MODEL_INFO = {
++            'veo3.1-fast': { maxImages: 0, desc: 'Google最新Veo3.1快速模式，支持视频自动配套音频生成，性价比最高', price: '0.2', isThirdParty: true },
++            'veo3.1': { maxImages: 2, desc: 'Veo3.1快速模式，支持视频自动配套音频生成，支持首尾帧，性价比最高', price: '0.3', isThirdParty: true },
++            'veo3.1-components': { maxImages: 3, desc: 'Veo3.1快速模式，支持视频自动配套音频生成，支持多图融合参考(1-3张)', price: '0.3', isThirdParty: true },
++            'veo3.1-pro': { maxImages: 2, desc: 'Veo3.1高质量模式，支持视频自动配套音频生成，支持首尾帧，质量超高', price: '1', isThirdParty: true },
++            'veo3.1-pro-4k': { maxImages: 0, desc: 'Veo3.1 4K模式，支持视频自动配套音频生成，质量超高，价格也超高', price: '2', isThirdParty: true },
++        };
++
++        function getVeoModelMaxImages(model) {
++            const info = VEO_MODEL_INFO[model];
++            if (info) return info.maxImages;
++            return 2; // Default for Google native models
++        }
++
++        function isThirdPartyVeoModel(model) {
++            const info = VEO_MODEL_INFO[model];
++            return info ? info.isThirdParty : false;
++        }
++
++        function onVeoModelChange() {
++            const model = document.getElementById('veoModelName').value;
++            const info = VEO_MODEL_INFO[model];
++            const infoEl = document.getElementById('veoModelInfo');
++            const hintEl = document.getElementById('videoRefHint');
++            const negSection = document.getElementById('negativePromptSection');
++            const maxImg = getVeoModelMaxImages(model);
++
++            // Update model info description
++            if (info) {
++                infoEl.innerHTML = `<strong>${model}</strong> 💰${info.price}/次 — ${info.desc}`;
++                infoEl.style.display = 'block';
++            } else {
++                infoEl.innerHTML = `Google 原生模型: ${model}`;
++                infoEl.style.display = 'block';
++            }
++
++            // Update reference image hint
++            if (maxImg === 0) {
++                hintEl.innerText = '当前模型: 纯文生视频，不支持参考图';
++            } else if (model === 'veo3.1-components') {
++                hintEl.innerText = `当前模型: 支持 1~${maxImg} 张参考图 (多图融合，图片为视频中的元素)`;
++            } else {
++                hintEl.innerText = `当前模型: 支持 1~${maxImg} 张参考图 (首帧${maxImg > 1 ? '+尾帧' : ''})`;
++            }
++
++            // Show/hide negative prompt (only for Google native)
++            if (isThirdPartyVeoModel(model)) {
++                negSection.style.display = 'none';
++            } else {
++                negSection.style.display = 'block';
++            }
++
++            // Trim excess images if exceeds new model's limit
++            if (maxImg === 0 && videoRefImages.length > 0) {
++                videoRefImages = [];
++                renderVideoRefs();
++            } else if (videoRefImages.length > maxImg && maxImg > 0) {
++                videoRefImages = videoRefImages.slice(0, maxImg);
++                renderVideoRefs();
++            }
++        }
++
+         // --- Video Reference Processing Functions ---
+         function processVideoFiles(files) {
+-            if (videoRefImages.length + files.length > 2) return alert("Veo 视频生成最高支持 2 张参考图(首尾帧)");
++            const model = document.getElementById('veoModelName').value;
++            const maxImg = getVeoModelMaxImages(model);
++            if (maxImg === 0) return alert(`当前模型 ${model} 不支持参考图（纯文生视频）`);
++            if (videoRefImages.length + files.length > maxImg) return alert(`当前模型最多支持 ${maxImg} 张参考图`);
+             Array.from(files).forEach(file => {
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+@@ -1878,9 +1967,16 @@
+         }
+ 
+         function renderVideoRefs() {
++            const model = document.getElementById('veoModelName').value;
++            const isComponents = (model === 'veo3.1-components');
+             videoRefGrid.innerHTML = '';
+             videoRefImages.forEach((img, idx) => {
+-                const label = idx === 0 ? "起" : "终";
++                let label;
++                if (isComponents) {
++                    label = `素材${idx + 1}`;
++                } else {
++                    label = idx === 0 ? "首帧" : "尾帧";
++                }
+                 videoRefGrid.innerHTML += `<div class="ref-item">
+                     <div style="position: absolute; top: 0; left: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; padding: 2px 4px; border-bottom-right-radius: 4px; z-index: 1;">${label}</div>
+                     <img src="${img.display}">
+@@ -1995,241 +2091,39 @@
+                         throw new Error(proxyError || "Empty response from proxy image endpoint");
+                     }
+                 } else {
+-                    const parts = [];
+-                    if (prompt) parts.push({ text: prompt });
+-                    refs.forEach(img => parts.push({ inline_data: { mime_type: img.mimeType, data: img.data } }));
+-
+-                    const payload = {
+-                        systemInstruction: {
+-                            parts: [{ text: "You are a specialized image generation AI. Output ONLY the generated image." }]
+-                        },
+-                        contents: [{ parts: parts }],
+-                        safetySettings: [
+-                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+-                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+-                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+-                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+-                        ],
+-                        generationConfig: {
+-                            responseModalities: ["IMAGE", "TEXT"],
+-                            imageConfig: { aspectRatio: aspectRatio, imageSize: resolution }
+-                        }
+-                    };
+-
+-                    let baseUrl = apiBaseUrl || "https://generativelanguage.googleapis.com";
+-                    baseUrl = baseUrl.replace(/\/+$/, '');
+-
+-                    const response = await fetch(`${baseUrl}/v1beta/models/${requestModel}:generateContent?key=${apiKey}`, {
+-                        method: 'POST',
+-                        headers: { 'Content-Type': 'application/json' },
+-                        body: JSON.stringify(payload),
+-                        signal: imageAbortController.signal
+-                    });
+-
+-                    if (!response.ok) {
+-                        const err = await response.json();
+-                        throw new Error(err.error?.message || response.status);
+-                    }
+-
+-                    const data = await response.json();
+-                    const candidate = data.candidates?.[0];
+-
+-                    if (candidate?.finishReason === 'SAFETY') throw new Error("Blocked by Safety Filter");
+-                    if (!candidate?.content?.parts) throw new Error("Empty response");
+-
+-                    for (const part of candidate.content.parts) {
+-                        if (part.inlineData) finalBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+-                    }
+-                }
+-
+-                if (finalBase64) {
+-                    const resultImg = document.getElementById('resultImg');
+-                    const dlLink = document.getElementById('downloadLink');
+-
+-                    resultImg.src = finalBase64;
+-                    resultImg.style.display = 'block';
+-                    updateImageQueueStatus("Success", "#22c55e");
+-
+-                    saveToGallery(finalBase64, prompt, resolution, "image");
+-
+-                    dlLink.onclick = (e) => {
+-                        e.preventDefault();
+-                        downloadFile(finalBase64, `gemini-${Date.now()}.png`);
+-                    };
+-                    dlLink.style.display = 'block';
+-                } else {
+-                    throw new Error("Model returned text only.");
+-                }
+-            } catch (e) {
+-                if (e.name === 'AbortError') return;
+-                showError('image', e.message);
+-            } finally {
+-                if (imageQueue.length === 0) {
+-                    document.getElementById('cancelBtn').style.display = 'none';
+-                }
+-                toggleUI('image', false);
+-            }
+-        }
+-
+-        // --- Generate Image (with queue, max 3) ---
+-        async function generate() {
+-            const apiKey = document.getElementById('apiKey').value.trim();
+-            let prompt = document.getElementById('prompt').value.trim();
+-            const resolution = document.getElementById('resolution').value;
+-            const aspectRatio = document.getElementById('aspectRatio').value;
+-            const model = document.getElementById('imageModelName').value.trim() || DEFAULT_IMAGE_MODEL;
+-            const visualStyle = document.getElementById('visualStyle').value;
+-            const renderText = document.getElementById('renderText').value.trim();
+-
+-            if (!apiKey) return alert("Please enter Google API Key");
+-            if (!prompt && refImages.length === 0) return alert("Please enter prompt text");
+-
+-            if (visualStyle) prompt = `[Style: ${visualStyle}] ` + prompt;
+-            if (renderText) prompt += `\nThe image MUST contain the precise text: "${renderText}"`;
+-
+-            if (getImageQueueLoad() >= IMAGE_QUEUE_MAX) {
+-                return alert(`Queue full. Max tasks: ${IMAGE_QUEUE_MAX}`);
+-            }
+-
+-            imageQueue.push({
+-                apiKey,
+-                prompt,
+-                resolution,
+-                aspectRatio,
+-                model,
+-                refs: refImages.map(img => ({ mimeType: img.mimeType, data: img.data }))
+-            });
+-
+-            updateImageQueueButton();
+-
+-            if (imageIsProcessing) {
+-                updateImageQueueStatus("Added to queue", "#666");
+-            } else {
+-                updateImageQueueStatus("Task submitted", "#666");
+-            }
+-
+-            processImageQueue();
+-        }
+-        // ================= Veo 视频生成 (FPS Removed) =================
+-        async function generateVideo() {
+-            const apiKey = apiKeyInput.value.trim();
+-            const prompt = document.getElementById('videoPrompt').value.trim();
+-            const negPrompt = document.getElementById('negativePrompt').value.trim();
+-            const model = document.getElementById('veoModelName').value.trim();
+-            const aspectRatio = document.getElementById('veoAspectRatio').value;
+-            const seedVal = document.getElementById('videoSeed').value;
+-            // FPS logic removed
+-
+-            const apiProtocol = document.getElementById('apiProtocol').value;
+-            let apiBaseUrl = document.getElementById('apiBaseUrl').value.trim();
+-
+-            if (!apiKey) return alert("请在生图/配置页面填写 API Key");
+-            if (!prompt) return alert("请填写视频提示词");
+-
+-            toggleUI('video', true);
+-            const status = document.getElementById('videoStatus');
+-
+-            try {
+-                status.innerText = "正在提交任务...";
+-
+-                if (apiProtocol === 'openai') {
+-                    if (!apiBaseUrl) apiBaseUrl = "https://api.openai.com";
+-                    apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
+-
+-                    const payload = {
+-                        model: model,
+-                        messages: [
+-                            { role: "system", content: "You are a video generation assistant. You must quickly return the final generated video URL if available." },
+-                            { role: "user", content: prompt }
+-                        ]
+-                    };
+-
+-                    const response = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
+-                        method: 'POST',
+-                        headers: {
+-                            'Content-Type': 'application/json',
+-                            'Authorization': `Bearer ${apiKey}`
+-                        },
+-                        body: JSON.stringify(payload)
+-                    });
+-
+-                    if (!response.ok) {
+-                        const err = await response.json().catch(() => ({}));
+-                        throw new Error(err.error?.message || response.status);
+-                    }
++                    const data = await res.json();
+ 
+-                    const data = await response.json();
+-                    const content = data.choices?.[0]?.message?.content;
++                    if (data.error) throw new Error(data.error.message || data.error);
+ 
+-                    if (!content) throw new Error("Empty response from OpenAI endpoint");
++                    const taskStatus = data.status || data.state;
+ 
+-                    // Try parsing URL from markdown or plaintext
+-                    const urlMatch = content.match(/https?:\/\/[^\s"'<()]+/);
+-                    if (urlMatch) {
+-                        status.innerText = "生成完成，下载中...";
+-                        await displayVideo(urlMatch[0], apiKey, prompt);
++                    if (taskStatus === 'completed' || taskStatus === 'success' || taskStatus === 'done') {
++                        let videoUrl = data?.data?.[0]?.url || data?.url || data?.video_url || data?.result?.url || data?.output?.video_url;
++                        if (!videoUrl) {
++                            const jsonStr = JSON.stringify(data);
++                            const urlMatch = jsonStr.match(/https?:\/\/[^\s"'<>\\]+/);
++                            if (urlMatch) videoUrl = urlMatch[0];
++                        }
++                        if (videoUrl) {
++                            status.innerText = "生成完成，下载中...";
++                            await displayVideo(videoUrl, apiKey, prompt, 'proxy');
++                        } else {
++                            throw new Error('任务完成但未找到视频URL');
++                        }
++                    } else if (taskStatus === 'failed' || taskStatus === 'error') {
++                        throw new Error(data.message || data.error || '视频生成失败');
++                    } else if (attempts >= maxAttempts) {
++                        throw new Error('轮询超时，请稍后刷新查看');
+                     } else {
+-                        // Output the text straight to the screen if it wasn't a URL
+-                        throw new Error(`Proxy replied text instead of Direct URL:\n${content.substring(0, 100)}...`);
+-                    }
+-                } else {
+-                    let baseUrl = apiBaseUrl || "https://generativelanguage.googleapis.com";
+-                    baseUrl = baseUrl.replace(/\/+$/, '');
+-                    const url = `${baseUrl}/v1beta/models/${model}:predictLongRunning?key=${apiKey}`;
+-
+-                    // 构建 Instance 对象
+-                    const instance = { prompt: prompt };
+-
+-                    // 使用 bytesBase64Encoded (Veo标准)
+-                    if (videoRefImages.length > 0) {
+-                        instance.image = {
+-                            bytesBase64Encoded: videoRefImages[0].data,
+-                            mimeType: videoRefImages[0].mimeType
+-                        };
+-                    }
+-                    if (videoRefImages.length > 1) {
+-                        instance.lastFrame = {
+-                            bytesBase64Encoded: videoRefImages[1].data,
+-                            mimeType: videoRefImages[1].mimeType
+-                        };
+-                    }
+-
+-                    // 构建 Parameters 对象
+-                    const parameters = {
+-                        aspectRatio: aspectRatio,
+-                        negativePrompt: negPrompt || undefined
+-                    };
+-
+-                    if (seedVal && parseInt(seedVal) !== -1) {
+-                        parameters.seed = parseInt(seedVal);
++                        status.innerText = `生成中... (${new Date().toLocaleTimeString()}) [${attempts}/${maxAttempts}]`;
++                        setTimeout(poll, 5000);
+                     }
+-
+-                    parameters.sampleCount = 1;
+-
+-                    const payload = {
+-                        instances: [instance],
+-                        parameters: parameters
+-                    };
+-
+-                    const response = await fetch(url, {
+-                        method: 'POST',
+-                        headers: { 'Content-Type': 'application/json' },
+-                        body: JSON.stringify(payload)
+-                    });
+-
+-                    const data = await response.json();
+-
+-                    if (data.error) throw new Error(data.error.message);
+-                    if (!data.name) throw new Error("未返回 operation name");
+-
+-                    status.innerText = "生成中 (任务已提交，轮询状态中)...";
+-                    await pollOperation(data.name, apiKey, prompt, baseUrl);
++                } catch (e) {
++                    showError('video', e.message);
++                    toggleUI('video', false);
+                 }
+-
+-            } catch (e) {
+-                showError('video', e.message);
+-                toggleUI('video', false);
+-            }
++            };
++            setTimeout(poll, 5000);
+         }
+ 
+         async function pollOperation(operationName, apiKey, prompt, baseUrl = "https://generativelanguage.googleapis.com") {
