@@ -849,7 +849,7 @@
                     <label>API 模式 (Protocol)</label>
                     <select id="apiProtocol" onchange="updateApiPlaceholders()">
                         <option value="google" selected>Google 原生 (Native)</option>
-                        <option value="openai">OpenAI 代理 (Proxy)</option>
+                        <option value="openai">第三方中转 (Proxy)</option>
                     </select>
                 </div>
                 <div class="col">
@@ -872,9 +872,9 @@
                     <button class="btn-mini" onclick="fetchModels('imageModelName')">🔄 读取模型</button>
                 </div>
                 <select id="imageModelName">
-                    <option value="gemini-3.1-flash-image-preview" selected>gemini-3.1-flash-image-preview</option>
-                    <option value="gemini-3-pro-image-preview">gemini-3-pro-image-preview</option>
-                    <option value="gpt-image-2">gpt-image-2 (第三方)</option>
+                    <option value="gemini-3-pro-image-preview">Gemini 3 Image Pro</option>
+                    <option value="gemini-3.1-flash-image-preview" selected>Gemini 3.1 Image Fast</option>
+                    <option value="gpt-image-2">GPT Image 2</option>
                 </select>
             </div>
 
@@ -1176,6 +1176,19 @@
 
     <script>
         const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image-preview";
+        const MAGIC_TOKEN_USAGE_URL = "https://magic666.top/api/usage/token/";
+        const MAGIC_QUOTA_PER_UNIT = 500000;
+        const ALLOWED_IMAGE_MODEL_KINDS = Object.freeze(["gemini3pro", "gemini31fast", "gptimage2"]);
+        const ALLOWED_IMAGE_MODEL_LABELS = Object.freeze({
+            gemini3pro: "Gemini 3 Image Pro",
+            gemini31fast: "Gemini 3.1 Image Fast",
+            gptimage2: "GPT Image 2"
+        });
+        const ALLOWED_IMAGE_MODEL_PREFERRED_IDS = Object.freeze({
+            gemini3pro: "gemini-3-pro-image-preview",
+            gemini31fast: "gemini-3.1-flash-image-preview",
+            gptimage2: "gpt-image-2"
+        });
         const IMAGE_QUEUE_MAX = 3;
         const MAX_IMAGES = 14;
         const ITEMS_PER_PAGE = 12;
@@ -1185,12 +1198,28 @@
             { value: "4K", label: "4K (Ultra)" }
         ]);
         const GPT_IMAGE_2_RESOLUTION_OPTIONS = Object.freeze([
-            { value: "auto", label: "auto (Default)" },
             { value: "1K", label: "1K" },
             { value: "2K", label: "2K" },
             { value: "4K", label: "4K" }
         ]);
-        const GPT_IMAGE_2_RESOLUTION_TARGET_LONG_EDGE = Object.freeze({ "1K": 1024, "2K": 2048, "4K": 3840 });
+        const GPT_IMAGE_2_ALLOWED_SIZES = Object.freeze([
+            "1024x1024",
+            "1536x1024",
+            "1024x1536",
+            "2048x2048",
+            "2048x1152",
+            "1920x1080",
+            "1080x1920",
+            "3840x2160",
+            "2160x3840"
+        ]);
+        const GPT_IMAGE_2_SIZE_BY_RESOLUTION_AND_ASPECT = Object.freeze({
+            "1:1": { "1K": "1024x1024", "2K": "2048x2048", "4K": "2048x2048" },
+            "3:4": { "1K": "1024x1536", "2K": "1080x1920", "4K": "2160x3840" },
+            "4:3": { "1K": "1536x1024", "2K": "2048x1152", "4K": "3840x2160" },
+            "9:16": { "1K": "1080x1920", "2K": "1080x1920", "4K": "2160x3840" },
+            "16:9": { "1K": "1920x1080", "2K": "2048x1152", "4K": "3840x2160" }
+        });
 
         let refImages = [];
         let videoRefImages = [];
@@ -1200,39 +1229,80 @@
         let bgKeyIndex = 0;
         let imageAbortController = null;
 
-        function mapAspectRatioToProxySize(aspectRatio) {
-            if (!aspectRatio || aspectRatio === '1:1') return '1024x1024';
+        function normalizeModelId(model) {
+            return (model || '').trim().replace(/^models\//, '').toLowerCase();
+        }
 
-            const [w, h] = aspectRatio.split(':').map(Number);
-            if (!w || !h) return '1024x1024';
+        function getAllowedImageModelKind(model) {
+            const id = normalizeModelId(model);
+            if (id === 'gemini-3-pro-image-preview') {
+                return 'gemini3pro';
+            }
+            if (id === 'gemini-3.1-fast-image-preview' || id === 'gemini-3.1-flash-image-preview') {
+                return 'gemini31fast';
+            }
+            if (id === 'gpt-image-2') {
+                return 'gptimage2';
+            }
+            return null;
+        }
 
-            if (w > h) return '1536x1024';
-            if (w < h) return '1024x1536';
-            return '1024x1024';
+        function normalizeAllowedImageModelForRequest(model) {
+            const id = normalizeModelId(model);
+            const kind = getAllowedImageModelKind(id);
+            if (!kind) return DEFAULT_IMAGE_MODEL;
+            return id;
+        }
+
+        function isAllowedImageModel(model) {
+            return Boolean(getAllowedImageModelKind(model));
+        }
+
+        function getAllowedImageModelLabel(model) {
+            const kind = getAllowedImageModelKind(model);
+            return kind ? ALLOWED_IMAGE_MODEL_LABELS[kind] : model;
+        }
+
+        function filterAllowedImageModels(models) {
+            const bestByKind = new Map();
+            models.forEach((model, index) => {
+                const kind = getAllowedImageModelKind(model);
+                if (!kind) return;
+
+                const id = normalizeModelId(model);
+                const preferredId = ALLOWED_IMAGE_MODEL_PREFERRED_IDS[kind];
+                const score = (id === preferredId ? 0 : 10) + index / 1000;
+                const existing = bestByKind.get(kind);
+
+                if (!existing || score < existing.score) {
+                    bestByKind.set(kind, { model: id, score });
+                }
+            });
+
+            return ALLOWED_IMAGE_MODEL_KINDS
+                .map(kind => bestByKind.get(kind)?.model)
+                .filter(Boolean);
         }
 
         function isGptImage2Model(model) {
-            return (model || '').trim() === 'gpt-image-2';
+            return normalizeModelId(model) === 'gpt-image-2';
+        }
+
+        function isGeminiImageModel(model) {
+            return /^gemini-/i.test(normalizeGeminiModelNameForPath(model)) && /image/i.test(model || '');
+        }
+
+        function normalizeGeminiModelNameForPath(model) {
+            return (model || '').trim().replace(/^models\//, '');
+        }
+
+        function buildGeminiGenerateContentUrl(baseUrl, model) {
+            const modelName = encodeURIComponent(normalizeGeminiModelNameForPath(model));
+            return `${baseUrl}/v1beta/models/${modelName}:generateContent`;
         }
 
         function isValidGptImage2Size(size) {
-            if (size === 'auto') return true;
-
-            const match = String(size || '').match(/^(\d+)x(\d+)$/);
-            if (!match) return false;
-
-            const width = Number(match[1]);
-            const height = Number(match[2]);
-            const longEdge = Math.max(width, height);
-            const shortEdge = Math.min(width, height);
-            const pixels = width * height;
-
-            return longEdge <= 3840
-                && width % 16 === 0
-                && height % 16 === 0
-                && longEdge / shortEdge <= 3
-                && pixels >= 655360
-                && pixels <= 8294400;
+            return GPT_IMAGE_2_ALLOWED_SIZES.includes(String(size || '').trim());
         }
 
         function parseAspectRatio(aspectRatio) {
@@ -1241,74 +1311,43 @@
             return { width, height };
         }
 
-        function getGptImage2TargetRatio(aspectRatio) {
-            const parsed = parseAspectRatio(aspectRatio);
-            const ratio = parsed.width / parsed.height;
-            return Math.min(3, Math.max(1 / 3, ratio));
-        }
-
-        function calculateGptImage2Size(resolution, aspectRatio) {
-            const targetLongEdge = GPT_IMAGE_2_RESOLUTION_TARGET_LONG_EDGE[resolution];
-            if (!targetLongEdge) return isValidGptImage2Size(resolution) ? resolution : mapAspectRatioToProxySize(aspectRatio);
-
-            const targetLongUnits = targetLongEdge / 16;
-            const desiredRatio = getGptImage2TargetRatio(aspectRatio);
-            const maxUnits = 3840 / 16;
-            const minPixelUnits = 655360 / (16 * 16);
-            const maxPixelUnits = 8294400 / (16 * 16);
-            let best = null;
-
-            for (let widthUnits = 1; widthUnits <= maxUnits; widthUnits++) {
-                for (let heightUnits = 1; heightUnits <= maxUnits; heightUnits++) {
-                    const longUnits = Math.max(widthUnits, heightUnits);
-                    const shortUnits = Math.min(widthUnits, heightUnits);
-                    const pixelUnits = widthUnits * heightUnits;
-
-                    if (pixelUnits < minPixelUnits || pixelUnits > maxPixelUnits) continue;
-                    if (longUnits / shortUnits > 3) continue;
-                    if (desiredRatio > 1 && widthUnits < heightUnits) continue;
-                    if (desiredRatio < 1 && heightUnits < widthUnits) continue;
-
-                    const ratio = widthUnits / heightUnits;
-                    const ratioScore = Math.abs(Math.log(ratio / desiredRatio));
-                    const edgeScore = Math.abs(longUnits - targetLongUnits) / maxUnits;
-                    const score = ratioScore * 1000 + edgeScore;
-
-                    if (!best || score < best.score) {
-                        best = { widthUnits, heightUnits, score };
-                    }
-                }
+        function getGptImage2SizeMapForAspect(aspectRatio) {
+            if (GPT_IMAGE_2_SIZE_BY_RESOLUTION_AND_ASPECT[aspectRatio]) {
+                return GPT_IMAGE_2_SIZE_BY_RESOLUTION_AND_ASPECT[aspectRatio];
             }
 
-            if (!best) return mapAspectRatioToProxySize(aspectRatio);
-            return `${best.widthUnits * 16}x${best.heightUnits * 16}`;
+            const parsed = parseAspectRatio(aspectRatio);
+            if (parsed.width > parsed.height) return GPT_IMAGE_2_SIZE_BY_RESOLUTION_AND_ASPECT["16:9"];
+            if (parsed.width < parsed.height) return GPT_IMAGE_2_SIZE_BY_RESOLUTION_AND_ASPECT["9:16"];
+            return GPT_IMAGE_2_SIZE_BY_RESOLUTION_AND_ASPECT["1:1"];
         }
 
         function normalizeGptImage2Resolution(resolution, aspectRatio) {
-            if (resolution === 'auto') return 'auto';
-            if (GPT_IMAGE_2_RESOLUTION_TARGET_LONG_EDGE[resolution]) return calculateGptImage2Size(resolution, aspectRatio);
             if (isValidGptImage2Size(resolution)) return resolution;
-            return calculateGptImage2Size('1K', aspectRatio);
+            const sizeMap = getGptImage2SizeMapForAspect(aspectRatio);
+            return sizeMap[resolution] || sizeMap["1K"] || "1024x1024";
         }
 
-        function getResolutionOptionsForImageModel(model) {
+        function getResolutionOptionsForImageModel(model, aspectRatio) {
             return isGptImage2Model(model) ? GPT_IMAGE_2_RESOLUTION_OPTIONS : GEMINI_RESOLUTION_OPTIONS;
         }
 
-        function getDefaultResolutionForImageModel(model) {
+        function getDefaultResolutionForImageModel(model, aspectRatio) {
             if (isGptImage2Model(model)) return '1K';
             return '2K';
         }
 
         function getResolutionOptionLabel(option, model, aspectRatio) {
-            if (!isGptImage2Model(model) || option.value === 'auto') return option.label;
-            return `${option.label} - ${calculateGptImage2Size(option.value, aspectRatio)}`;
+            if (isGptImage2Model(model)) return `${option.label} -> ${normalizeGptImage2Resolution(option.value, aspectRatio)}`;
+            return option.label;
         }
 
         function buildOpenAIImagePayload(requestModel, promptWithAspect, aspectRatio, resolution) {
             const payload = {
                 model: requestModel,
-                prompt: promptWithAspect
+                prompt: promptWithAspect,
+                n: 1,
+                response_format: 'b64_json'
             };
 
             if (isGptImage2Model(requestModel)) {
@@ -1320,14 +1359,92 @@
             return payload;
         }
 
+        function buildGeminiImageParts(prompt, refs) {
+            const parts = [];
+            if (prompt) parts.push({ text: prompt });
+            refs.forEach(img => {
+                parts.push({
+                    inline_data: {
+                        mime_type: img.mimeType,
+                        data: img.data
+                    }
+                });
+            });
+            return parts;
+        }
+
+        function buildGeminiImagePayload(prompt, refs, aspectRatio, resolution, options = {}) {
+            const payload = {
+                contents: [{
+                    role: 'user',
+                    parts: buildGeminiImageParts(prompt, refs)
+                }],
+                safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                ],
+                generationConfig: {
+                    responseModalities: ["TEXT", "IMAGE"],
+                    imageConfig: { aspectRatio: aspectRatio, imageSize: resolution }
+                }
+            };
+
+            if (options.includeSystemInstruction) {
+                payload.systemInstruction = {
+                    parts: [{ text: "You are a specialized image generation AI. Output ONLY the generated image." }]
+                };
+            }
+
+            return payload;
+        }
+
         function buildProxyAspectRatioPrompt(prompt, aspectRatio) {
             if (!aspectRatio || aspectRatio === '1:1') return prompt;
             return `${prompt}\nAspect ratio requirement: ${aspectRatio}. Keep the final composition in this ratio.`;
         }
 
+        async function readJsonResponse(response) {
+            const text = await response.text();
+            if (!text) return {};
+            try {
+                return JSON.parse(text);
+            } catch (_) {
+                throw new Error(text.slice(0, 500));
+            }
+        }
+
+        function getApiErrorMessage(data, fallback) {
+            if (typeof data?.error === 'string') return data.error;
+            return data?.error?.message || data?.message || fallback;
+        }
+
+        function extractImageFromGeminiResponse(data) {
+            const candidate = data?.candidates?.[0];
+            const parts = candidate?.content?.parts || [];
+
+            for (const part of parts) {
+                const inlineData = part.inlineData || part.inline_data;
+                if (inlineData?.data) {
+                    const mimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+                    return `data:${mimeType};base64,${inlineData.data}`;
+                }
+            }
+
+            return null;
+        }
+
+        function assertGeminiImageResponse(data) {
+            const candidate = data?.candidates?.[0];
+            if (candidate?.finishReason === 'SAFETY') throw new Error("Blocked by Safety Filter");
+            if (!candidate?.content?.parts) throw new Error("Empty response");
+        }
+
         function extractImageFromProxyResponse(data) {
             const directImage = data?.data?.[0];
             if (directImage?.b64_json) return `data:image/png;base64,${directImage.b64_json}`;
+            if (directImage?.image_base64) return `data:image/png;base64,${directImage.image_base64}`;
             if (directImage?.url) return directImage.url;
 
             const responseOutput = data?.output || [];
@@ -1364,20 +1481,18 @@
         }
 
         function resolveImageModelForRequest(apiProtocol, selectedModel, resolution) {
+            selectedModel = normalizeAllowedImageModelForRequest(selectedModel);
+
             if (apiProtocol !== 'openai') {
                 return selectedModel;
             }
 
-            if (selectedModel === 'gpt-image-2') {
+            if (isGptImage2Model(selectedModel)) {
                 return selectedModel;
             }
 
-            if (resolution === '2K') {
-                return 'gemini-3.1-flash-image-preview-2k';
-            }
-
-            if (resolution === '4K') {
-                return 'gemini-3.1-flash-image-preview-4k';
+            if (isGeminiImageModel(selectedModel)) {
+                return normalizeGeminiModelNameForPath(selectedModel);
             }
 
             return selectedModel;
@@ -1442,7 +1557,7 @@
         function updateApiPlaceholders() {
             const mode = apiProtocolInput.value;
             if (mode === 'openai') {
-                apiBaseUrlInput.placeholder = "例: https://api.yourproxy.com";
+                apiBaseUrlInput.placeholder = "例: https://api.yourproxy.com (Gemini 中转必填)";
                 apiKeyLabel.innerText = "API Key (Bearer)";
             } else {
                 apiBaseUrlInput.placeholder = "默认: https://generativelanguage...";
@@ -1456,7 +1571,6 @@
             const optionSet = isGptImage2Model(model) ? 'gpt-image-2' : 'gemini';
             const options = getResolutionOptionsForImageModel(model);
             const currentValue = resolutionInput.value;
-            const previousOptionSet = resolutionInput.dataset.optionSet;
 
             resolutionInput.innerHTML = '';
             options.forEach(option => {
@@ -1467,7 +1581,7 @@
             });
             resolutionInput.dataset.optionSet = optionSet;
 
-            if (previousOptionSet === optionSet && options.some(option => option.value === currentValue)) {
+            if (options.some(option => option.value === currentValue)) {
                 resolutionInput.value = currentValue;
             } else {
                 resolutionInput.value = getDefaultResolutionForImageModel(model);
@@ -2230,86 +2344,84 @@
                 let finalBase64 = null;
 
                 if (apiProtocol === 'openai') {
+                    if (!apiBaseUrl && isGeminiImageModel(requestModel)) {
+                        throw new Error("Gemini 第三方中转需要填写 Base URL");
+                    }
                     if (!apiBaseUrl) apiBaseUrl = "https://api.openai.com";
                     apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
 
-                    const promptWithAspect = buildProxyAspectRatioPrompt(prompt, aspectRatio);
-                    let proxyError = "";
+                    if (isGeminiImageModel(requestModel)) {
+                        const payload = buildGeminiImagePayload(prompt, refs, aspectRatio, resolution);
+                        const response = await fetch(buildGeminiGenerateContentUrl(apiBaseUrl, requestModel), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify(payload),
+                            signal: imageAbortController.signal
+                        });
 
-                    const payload = buildOpenAIImagePayload(requestModel, promptWithAspect, aspectRatio, resolution);
+                        const data = await readJsonResponse(response);
+                        if (!response.ok) {
+                            throw new Error(getApiErrorMessage(data, response.status));
+                        }
 
-                    if (refs.length > 0) {
-                        payload.image = refs.map(img => `data:${img.mimeType};base64,${img.data}`);
+                        assertGeminiImageResponse(data);
+                        finalBase64 = extractImageFromGeminiResponse(data);
+                    } else {
+                        const promptWithAspect = isGptImage2Model(requestModel) ? prompt : buildProxyAspectRatioPrompt(prompt, aspectRatio);
+                        let proxyError = "";
+
+                        const payload = buildOpenAIImagePayload(requestModel, promptWithAspect, aspectRatio, resolution);
+
+                        if (refs.length > 0) {
+                            payload.image = refs.map(img => img.data);
+                        }
+
+                        const response = await fetch(`${apiBaseUrl}/v1/images/generations`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify(payload),
+                            signal: imageAbortController.signal
+                        });
+
+                        const data = await readJsonResponse(response);
+                        if (!response.ok) {
+                            throw new Error(getApiErrorMessage(data, proxyError || response.status));
+                        }
+
+                        finalBase64 = extractImageFromProxyResponse(data);
                     }
-
-                    const response = await fetch(`${apiBaseUrl}/v1/images/generations`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'Authorization': `Bearer ${apiKey}`
-                        },
-                        body: JSON.stringify(payload),
-                        signal: imageAbortController.signal
-                    });
-
-                    if (!response.ok) {
-                        const err = await response.json().catch(() => ({}));
-                        throw new Error(err.error?.message || proxyError || response.status);
-                    }
-
-                    const data = await response.json();
-                    finalBase64 = extractImageFromProxyResponse(data);
 
                     if (!finalBase64) {
-                        throw new Error(proxyError || "Empty response from proxy image endpoint");
+                        throw new Error("Empty response from proxy image endpoint");
                     }
                 } else {
-                    const parts = [];
-                    if (prompt) parts.push({ text: prompt });
-                    refs.forEach(img => parts.push({ inline_data: { mime_type: img.mimeType, data: img.data } }));
-
-                    const payload = {
-                        systemInstruction: {
-                            parts: [{ text: "You are a specialized image generation AI. Output ONLY the generated image." }]
-                        },
-                        contents: [{ parts: parts }],
-                        safetySettings: [
-                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                        ],
-                        generationConfig: {
-                            responseModalities: ["IMAGE", "TEXT"],
-                            imageConfig: { aspectRatio: aspectRatio, imageSize: resolution }
-                        }
-                    };
+                    const payload = buildGeminiImagePayload(prompt, refs, aspectRatio, resolution, { includeSystemInstruction: true });
 
                     let baseUrl = apiBaseUrl || "https://generativelanguage.googleapis.com";
                     baseUrl = baseUrl.replace(/\/+$/, '');
 
-                    const response = await fetch(`${baseUrl}/v1beta/models/${requestModel}:generateContent?key=${apiKey}`, {
+                    const response = await fetch(`${buildGeminiGenerateContentUrl(baseUrl, requestModel)}?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload),
                         signal: imageAbortController.signal
                     });
 
+                    const data = await readJsonResponse(response);
                     if (!response.ok) {
-                        const err = await response.json();
-                        throw new Error(err.error?.message || response.status);
+                        throw new Error(getApiErrorMessage(data, response.status));
                     }
 
-                    const data = await response.json();
-                    const candidate = data.candidates?.[0];
-
-                    if (candidate?.finishReason === 'SAFETY') throw new Error("Blocked by Safety Filter");
-                    if (!candidate?.content?.parts) throw new Error("Empty response");
-
-                    for (const part of candidate.content.parts) {
-                        if (part.inlineData) finalBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    }
+                    assertGeminiImageResponse(data);
+                    finalBase64 = extractImageFromGeminiResponse(data);
                 }
 
                 if (finalBase64) {
@@ -2364,13 +2476,20 @@
         async function generate() {
             const apiKey = document.getElementById('apiKey').value.trim();
             let prompt = document.getElementById('prompt').value.trim();
-            const resolution = document.getElementById('resolution').value;
             const aspectRatio = document.getElementById('aspectRatio').value;
-            const model = document.getElementById('imageModelName').value.trim() || DEFAULT_IMAGE_MODEL;
+            const rawModel = document.getElementById('imageModelName').value.trim() || DEFAULT_IMAGE_MODEL;
+            const model = normalizeAllowedImageModelForRequest(rawModel);
             const visualStyle = document.getElementById('visualStyle').value;
             const renderText = document.getElementById('renderText').value.trim();
 
-            if (!apiKey) return alert("Please enter Google API Key");
+            if (rawModel !== model) {
+                const modelOption = Array.from(imageModelInput.options).find(option => option.value === model);
+                if (modelOption) imageModelInput.value = model;
+            }
+            syncImageResolutionOptions();
+            const resolution = document.getElementById('resolution').value;
+
+            if (!apiKey) return alert("Please enter API Key");
             if (!prompt && refImages.length === 0) return alert("Please enter prompt text");
 
             if (visualStyle) prompt = `[Style: ${visualStyle}] ` + prompt;
@@ -2761,6 +2880,70 @@
             document.getElementById(mode === 'image' ? 'status' : 'videoStatus').style.color = "#ef4444";
         }
 
+        function getMagicTokenUsageData(data) {
+            return data?.data || data || {};
+        }
+
+        function getMagicTokenAvailableQuota(usage) {
+            return usage.total_available ?? usage.totalAvailable ?? usage.remain_quota ?? usage.quota ?? 0;
+        }
+
+        function getMagicTokenGrantedQuota(usage) {
+            const granted = usage.total_granted ?? usage.totalGranted;
+            if (granted !== undefined) return granted;
+
+            const available = Number(getMagicTokenAvailableQuota(usage));
+            const used = Number(usage.total_used ?? usage.totalUsed ?? usage.used_quota ?? 0);
+            if (Number.isFinite(available) && Number.isFinite(used)) return available + used;
+            return undefined;
+        }
+
+        function convertMagicQuotaToDisplayAmount(value) {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) return value;
+            return numeric / MAGIC_QUOTA_PER_UNIT;
+        }
+
+        function formatMagicQuotaValue(value) {
+            const numeric = Number(convertMagicQuotaToDisplayAmount(value));
+            if (!Number.isFinite(numeric)) return String(value ?? 0);
+            return numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatMagicQuotaRawValue(value) {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) return String(value ?? 0);
+            return numeric.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+
+        function formatMagicQuotaDisplay(usage) {
+            const available = getMagicTokenAvailableQuota(usage);
+            const granted = getMagicTokenGrantedQuota(usage);
+            if (granted === undefined) return formatMagicQuotaValue(available);
+            return `${formatMagicQuotaValue(available)} / ${formatMagicQuotaValue(granted)}`;
+        }
+
+        function formatMagicTokenExpiry(expiresAt) {
+            const seconds = Number(expiresAt);
+            if (!Number.isFinite(seconds) || seconds <= 0) return "永不过期";
+            return new Date(seconds * 1000).toLocaleString();
+        }
+
+        function buildMagicTokenQuotaTitle(usage) {
+            const lines = [];
+            if (usage.name) lines.push(`令牌名称: ${usage.name}`);
+            if (usage.unlimited_quota) {
+                lines.push("额度: 无限");
+            } else {
+                lines.push(`剩余额度: ${formatMagicQuotaValue(getMagicTokenAvailableQuota(usage))}`);
+                if (usage.total_used !== undefined) lines.push(`已用额度: ${formatMagicQuotaValue(usage.total_used)}`);
+                if (getMagicTokenGrantedQuota(usage) !== undefined) lines.push(`总额度: ${formatMagicQuotaValue(getMagicTokenGrantedQuota(usage))}`);
+                lines.push(`原始剩余额度: ${formatMagicQuotaRawValue(getMagicTokenAvailableQuota(usage))}`);
+            }
+            if (usage.expires_at !== undefined) lines.push(`到期时间: ${formatMagicTokenExpiry(usage.expires_at)}`);
+            return lines.join('\n');
+        }
+
         async function fetchTokenQuota() {
             const protocol = document.getElementById('apiProtocol')?.value;
             const quotaDisplay = document.getElementById('tokenQuotaDisplay');
@@ -2772,8 +2955,7 @@
             }
 
             const apiKey = document.getElementById('apiKey')?.value.trim();
-            const apiBaseUrl = document.getElementById('apiBaseUrl')?.value.trim() || 'https://api.openai.com';
-            
+
             if (!apiKey) {
                 quotaDisplay.style.display = 'none';
                 return;
@@ -2784,18 +2966,22 @@
             quotaDisplay.title = "";
 
             try {
-                let baseUrl = apiBaseUrl.replace(/\/+$/, '');
-                const res = await fetch(`${baseUrl}/v1/token/quota`, {
+                const res = await fetch(MAGIC_TOKEN_USAGE_URL, {
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${apiKey}` }
                 });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                
-                let quota = Number(data.quota) || 0;
-                let formatted = quota.toLocaleString('en-US', { maximumFractionDigits: 4 });
-                quotaDisplay.innerHTML = `💰 余额: ${formatted}`;
-                if (data.name) quotaDisplay.title = `令牌名称: ${data.name}`;
+                const data = await readJsonResponse(res);
+                if (!res.ok || data.success === false || data.code === false) {
+                    throw new Error(getApiErrorMessage(data, `HTTP ${res.status}`));
+                }
+
+                const usage = getMagicTokenUsageData(data);
+                if (usage.unlimited_quota) {
+                    quotaDisplay.innerHTML = "💰 余额: 无限";
+                } else {
+                    quotaDisplay.innerHTML = `💰 余额: ${formatMagicQuotaDisplay(usage)}`;
+                }
+                quotaDisplay.title = buildMagicTokenQuotaTitle(usage);
             } catch (e) {
                 quotaDisplay.innerHTML = "💰 余额: 获取失败";
                 quotaDisplay.title = e.message;
@@ -2842,17 +3028,19 @@
 
                 if (models.length === 0) throw new Error("获取到的模型列表为空");
 
-                // 只展示有 'image' 字样的生图模型
+                // 只展示允许的生图模型：Gemini 3 Pro、Gemini 3.1 Fast/Flash、GPT Image 2
                 if (targetId === 'imageModelName') {
-                    models = models.filter(m => m.toLowerCase().includes('image'));
-                    if (models.length === 0) throw new Error("未找到包含 'image' 的可用模型");
+                    models = filterAllowedImageModels(models);
+                    if (models.length === 0) {
+                        throw new Error("未找到允许的生图模型：Gemini 3 Image Pro / Gemini 3.1 Image Fast / GPT Image 2");
+                    }
                 }
 
                 selectEl.innerHTML = '';
                 models.forEach(modelId => {
                     const opt = document.createElement('option');
                     opt.value = modelId;
-                    opt.innerText = modelId;
+                    opt.innerText = targetId === 'imageModelName' ? getAllowedImageModelLabel(modelId) : modelId;
                     selectEl.appendChild(opt);
                 });
 
