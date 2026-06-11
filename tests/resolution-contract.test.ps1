@@ -61,20 +61,20 @@ Assert-Sequence `
     -Name 'Gemini resolution options'
 
 Assert-True `
+    ($Html -match '<option\s+value="gemini-2\.5-flash-image"\s+selected>Nano Banana \(Gemini 2\.5 Flash Image\)</option>') `
+    'Static model selector must include Nano Banana as the default pay-as-you-go model.'
+
+Assert-True `
     ($Html -match '<option\s+value="gemini-3-pro-image-preview">Gemini 3 Image Pro</option>') `
     'Static model selector must include Gemini 3 Image Pro.'
 
 Assert-True `
-    ($Html -match '<option\s+value="gemini-3\.1-flash-image-preview"\s+selected>Gemini 3\.1 Image Fast</option>') `
+    ($Html -match '<option\s+value="gemini-3\.1-flash-image-preview">Gemini 3\.1 Image Fast</option>') `
     'Static model selector must include Gemini 3.1 Image Fast.'
 
 Assert-True `
     ($Html -match '<option\s+value="gpt-image-2">GPT Image 2</option>') `
     'Static model selector must include GPT Image 2.'
-
-Assert-True `
-    ($Html -notmatch '<option\s+value="gemini-2\.5-flash-image"') `
-    'Static model selector must hide Gemini 2.5 image models.'
 
 Assert-True `
     ($Html -notmatch '<option\s+value="gpt-image-2-pro"') `
@@ -125,6 +125,10 @@ Assert-True `
 Assert-True `
     ($Html -match 'getMagicTokenAvailableQuota\(usage\)') `
     'Token quota display must read the New API token usage available quota.'
+
+Assert-True `
+    ($Html -match "lower\.includes\('insufficient'\)\s*&&\s*lower\.includes\('quota'\)[\s\S]*?Nano Banana \(Gemini 2\.5 Flash Image\)[\s\S]*?Base URL") `
+    'Proxy quota errors must explain the Nano Banana pay-as-you-go model switch.'
 
 Assert-True `
     ($Html -match 'models\s*=\s*filterAllowedImageModels\(models\);') `
@@ -178,18 +182,19 @@ assertEqual(normalizeGptImage2Resolution('2K', '16:9'), '2048x1152', '2K 16:9 ma
 assertEqual(normalizeGptImage2Resolution('4K', '9:16'), '2160x3840', '4K 9:16 maps to popular portrait size');
 assertEqual(normalizeGptImage2Resolution('4K', '1:1'), '2048x2048', '4K square falls back to the largest documented square size');
 assertEqual(normalizeGptImage2Resolution('1536x1024', '1:1'), '1536x1024', 'Documented concrete sizes are preserved');
+assertEqual(getAllowedImageModelKind('gemini-2.5-flash-image'), 'nanobanana', 'Nano Banana pay-as-you-go image model is allowed');
 assertEqual(getAllowedImageModelKind('gemini-3-pro-image-preview'), 'gemini3pro', 'Gemini 3 Pro image model is allowed');
 assertEqual(getAllowedImageModelKind('gemini-3.1-fast-image-preview'), 'gemini31fast', 'Gemini 3.1 Fast image model is allowed');
 assertEqual(getAllowedImageModelKind('gemini-3.1-flash-image-preview'), 'gemini31fast', 'Gemini 3.1 Flash image model is treated as fast');
 assertEqual(getAllowedImageModelKind('gpt-image-2'), 'gptimage2', 'GPT Image 2 is allowed');
 assertEqual(getAllowedImageModelKind('gpt-image-2-pro'), null, 'GPT Image 2 Pro is hidden');
-assertEqual(getAllowedImageModelKind('gemini-2.5-flash-image'), null, 'Gemini 2.5 image models are hidden');
 assertEqual(getAllowedImageModelKind('gemini-3.1-flash-image-preview-2k'), null, 'Resolution-suffixed Gemini image models are hidden');
 assertEqual(resolveImageModelForRequest('openai', 'gpt-image-2', '2K'), 'gpt-image-2', 'GPT Image 2 request model stays exact and never falls through to Gemini');
+assertEqual(resolveImageModelForRequest('openai', 'gemini-2.5-flash-image', '2K'), 'gemini-2.5-flash-image', 'Nano Banana proxy requests keep the pay-as-you-go model id');
 assertEqual(
     JSON.stringify(filterAllowedImageModels(['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview-2k', 'gemini-3.1-flash-image-preview', 'gpt-image-2', 'gpt-image-2-pro'])),
-    JSON.stringify(['gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview', 'gpt-image-2']),
-    'Fetched image models are filtered to the three exact allowed choices'
+    JSON.stringify(['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview', 'gpt-image-2']),
+    'Fetched image models include Nano Banana and filter out unsupported variants'
 );
 "@
 
