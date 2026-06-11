@@ -1426,7 +1426,112 @@
             return data?.error?.message || data?.message || fallback;
         }
 
+        function extractImageUrlFromText(text) {
+            const content = String(text || '').trim();
+            if (!content) return null;
+
+            const dataUrlMatch = content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/);
+            if (dataUrlMatch) return dataUrlMatch[0];
+
+            const markdownImageMatch = content.match(/!\[[^\]]*\]\((https?:\/\/[^)\s"']+)\)/);
+            if (markdownImageMatch) return markdownImageMatch[1];
+
+            const urlMatch = content.match(/https?:\/\/[^\s"'<>()]+/);
+            if (urlMatch) return urlMatch[0];
+
+            return null;
+        }
+
+        function normalizeImageBase64(value, mimeType = 'image/png') {
+            if (typeof value !== 'string') return null;
+            const text = value.trim();
+            if (!text) return null;
+            if (/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(text)) return text;
+            if (/^[A-Za-z0-9+/]+={0,2}$/.test(text) && text.length > 128) {
+                return `data:${mimeType};base64,${text}`;
+            }
+            return null;
+        }
+
+        function extractImageFromAnyValue(value, depth = 0, seen = new Set()) {
+            if (value == null || depth > 8) return null;
+
+            if (typeof value === 'string') {
+                return extractImageUrlFromText(value) || normalizeImageBase64(value);
+            }
+
+            if (typeof value !== 'object') return null;
+            if (seen.has(value)) return null;
+            seen.add(value);
+
+            const mimeType = value.mimeType || value.mime_type || value.mediaType || value.media_type || 'image/png';
+            const directBase64 = normalizeImageBase64(
+                value.b64_json || value.image_base64 || value.base64 || value.data,
+                mimeType
+            );
+            if (directBase64) return directBase64;
+
+            const directUrl = value.url || value.image_url || value.imageUrl || value.fileUri || value.file_uri || value.uri;
+            if (typeof directUrl === 'string') {
+                const extractedUrl = extractImageUrlFromText(directUrl);
+                if (extractedUrl) return extractedUrl;
+            }
+
+            const textImage = extractImageUrlFromText(
+                value.text || (typeof value.content === 'string' ? value.content : '')
+            );
+            if (textImage) return textImage;
+
+            if (value.inlineData || value.inline_data) {
+                const inlineData = value.inlineData || value.inline_data;
+                const inlineImage = extractImageFromAnyValue(inlineData, depth + 1, seen);
+                if (inlineImage) return inlineImage;
+            }
+
+            if (value.fileData || value.file_data) {
+                const fileDataImage = extractImageFromAnyValue(value.fileData || value.file_data, depth + 1, seen);
+                if (fileDataImage) return fileDataImage;
+            }
+
+            if (value.image_url && typeof value.image_url === 'object') {
+                const imageUrl = extractImageFromAnyValue(value.image_url, depth + 1, seen);
+                if (imageUrl) return imageUrl;
+            }
+
+            const preferredKeys = ['data', 'images', 'image', 'output', 'result', 'content', 'parts', 'choices', 'message', 'candidates', 'response'];
+            for (const key of preferredKeys) {
+                if (value[key] === undefined || typeof value[key] === 'string') continue;
+                const nestedImage = extractImageFromAnyValue(value[key], depth + 1, seen);
+                if (nestedImage) return nestedImage;
+            }
+
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    const image = extractImageFromAnyValue(item, depth + 1, seen);
+                    if (image) return image;
+                }
+            }
+
+            return null;
+        }
+
+        function summarizeImageResponse(data) {
+            try {
+                return JSON.stringify(data, (key, value) => {
+                    if (typeof value === 'string' && value.length > 160) {
+                        return `${value.slice(0, 160)}...`;
+                    }
+                    return value;
+                }).slice(0, 800);
+            } catch (_) {
+                return String(data).slice(0, 800);
+            }
+        }
+
         function extractImageFromGeminiResponse(data) {
+            const anyImage = extractImageFromAnyValue(data);
+            if (anyImage) return anyImage;
+
             const candidate = data?.candidates?.[0];
             const parts = candidate?.content?.parts || [];
 
@@ -1448,6 +1553,9 @@
         }
 
         function extractImageFromProxyResponse(data) {
+            const anyImage = extractImageFromAnyValue(data);
+            if (anyImage) return anyImage;
+
             const directImage = data?.data?.[0];
             if (directImage?.b64_json) return `data:image/png;base64,${directImage.b64_json}`;
             if (directImage?.image_base64) return `data:image/png;base64,${directImage.image_base64}`;
@@ -2374,8 +2482,11 @@
                             throw new Error(getApiErrorMessage(data, response.status));
                         }
 
-                        assertGeminiImageResponse(data);
                         finalBase64 = extractImageFromGeminiResponse(data);
+                        if (!finalBase64) {
+                            assertGeminiImageResponse(data);
+                            throw new Error(`Empty response from proxy image endpoint: ${summarizeImageResponse(data)}`);
+                        }
                     } else {
                         const promptWithAspect = isGptImage2Model(requestModel) ? prompt : buildProxyAspectRatioPrompt(prompt, aspectRatio);
                         let proxyError = "";
@@ -2403,10 +2514,9 @@
                         }
 
                         finalBase64 = extractImageFromProxyResponse(data);
-                    }
-
-                    if (!finalBase64) {
-                        throw new Error("Empty response from proxy image endpoint");
+                        if (!finalBase64) {
+                            throw new Error(`Empty response from proxy image endpoint: ${summarizeImageResponse(data)}`);
+                        }
                     }
                 } else {
                     const payload = buildGeminiImagePayload(prompt, refs, aspectRatio, resolution, { includeSystemInstruction: true });
@@ -2426,8 +2536,11 @@
                         throw new Error(getApiErrorMessage(data, response.status));
                     }
 
-                    assertGeminiImageResponse(data);
                     finalBase64 = extractImageFromGeminiResponse(data);
+                    if (!finalBase64) {
+                        assertGeminiImageResponse(data);
+                        throw new Error(`Empty response from Gemini image endpoint: ${summarizeImageResponse(data)}`);
+                    }
                 }
 
                 if (finalBase64) {

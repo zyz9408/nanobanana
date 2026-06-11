@@ -192,6 +192,26 @@ assertEqual(getAllowedImageModelKind('gemini-3.1-flash-image-preview-2k'), null,
 assertEqual(resolveImageModelForRequest('openai', 'gpt-image-2', '2K'), 'gpt-image-2', 'GPT Image 2 request model stays exact and never falls through to Gemini');
 assertEqual(resolveImageModelForRequest('openai', 'gemini-2.5-flash-image', '2K'), 'gemini-2.5-flash-image', 'Nano Banana proxy requests keep the pay-as-you-go model id');
 assertEqual(
+    extractImageFromGeminiResponse({ candidates: [{ content: { parts: [{ text: '![image](https://cdn.example.com/gemini.png)' }] } }] }),
+    'https://cdn.example.com/gemini.png',
+    'Gemini extractor reads image URLs returned inside part text'
+);
+assertEqual(
+    extractImageFromGeminiResponse({ candidates: [{ content: { parts: [{ fileData: { fileUri: 'https://cdn.example.com/file-data.png' } }] } }] }),
+    'https://cdn.example.com/file-data.png',
+    'Gemini extractor reads fileData image URLs'
+);
+assertEqual(
+    extractImageFromGeminiResponse({ choices: [{ message: { content: 'result https://cdn.example.com/openai-style.png' } }] }),
+    'https://cdn.example.com/openai-style.png',
+    'Gemini proxy extractor also accepts OpenAI-style message content'
+);
+assertEqual(
+    extractImageFromProxyResponse({ response: { images: [{ url: 'https://cdn.example.com/nested.png' }] } }),
+    'https://cdn.example.com/nested.png',
+    'Proxy extractor reads nested image collections'
+);
+assertEqual(
     JSON.stringify(filterAllowedImageModels(['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview-2k', 'gemini-3.1-flash-image-preview', 'gpt-image-2', 'gpt-image-2-pro'])),
     JSON.stringify(['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview', 'gpt-image-2']),
     'Fetched image models include Nano Banana and filter out unsupported variants'
