@@ -873,6 +873,7 @@
                 <select id="imageModelName">
                     <option value="gemini-3-pro-image-preview" selected>Gemini 3 Image Pro</option>
                     <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Image Fast</option>
+                    <option value="gemini-3.1-flash-lite-image">Gemini 3.1 Flash Lite Image (1K)</option>
                     <option value="gpt-image-2">GPT Image 2</option>
                     <option value="gpt-image-2-pro">GPT Image 2 Pro (Native 4K)</option>
                 </select>
@@ -1185,6 +1186,9 @@
             { value: "2K", label: "2K (High Detail)" },
             { value: "4K", label: "4K (Ultra)" }
         ]);
+        const GEMINI_FLASH_LITE_RESOLUTION_OPTIONS = Object.freeze([
+            { value: "1K", label: "1K (1024px, model maximum)" }
+        ]);
         const GPT_IMAGE_2_RESOLUTION_OPTIONS = Object.freeze([
             { value: "1K", label: "1K" },
             { value: "2K", label: "2K" },
@@ -1229,6 +1233,9 @@
             if (id === 'gemini-3.1-fast-image-preview' || id === 'gemini-3.1-flash-image-preview') {
                 return 'gemini31fast';
             }
+            if (id === 'gemini-3.1-flash-lite-image') {
+                return 'gemini31flashlite';
+            }
             if (id === 'gpt-image-2') {
                 return 'gptimage2';
             }
@@ -1251,6 +1258,10 @@
 
         function isGptImage2Model(model) {
             return /^gpt-image-2(?:-pro)?$/.test(normalizeModelId(model));
+        }
+
+        function isGemini31FlashLiteImageModel(model) {
+            return normalizeModelId(model) === 'gemini-3.1-flash-lite-image';
         }
 
         function isGeminiImageModel(model) {
@@ -1294,10 +1305,12 @@
         }
 
         function getResolutionOptionsForImageModel(model, aspectRatio) {
+            if (isGemini31FlashLiteImageModel(model)) return GEMINI_FLASH_LITE_RESOLUTION_OPTIONS;
             return isGptImage2Model(model) ? GPT_IMAGE_2_RESOLUTION_OPTIONS : GEMINI_RESOLUTION_OPTIONS;
         }
 
         function getDefaultResolutionForImageModel(model, aspectRatio) {
+            if (isGemini31FlashLiteImageModel(model)) return '1K';
             if (isGptImage2Model(model)) return '1K';
             return '2K';
         }
@@ -1641,7 +1654,7 @@
         function syncImageResolutionOptions() {
             const resolutionInput = document.getElementById('resolution');
             const model = imageModelInput.value.trim() || DEFAULT_IMAGE_MODEL;
-            const optionSet = isGptImage2Model(model) ? 'gpt-image-2' : 'gemini';
+            const optionSet = isGemini31FlashLiteImageModel(model) ? 'gemini-flash-lite' : (isGptImage2Model(model) ? 'gpt-image-2' : 'gemini');
             const options = getResolutionOptionsForImageModel(model);
             const currentValue = resolutionInput.value;
 

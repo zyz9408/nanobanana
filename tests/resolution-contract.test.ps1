@@ -60,6 +60,11 @@ Assert-Sequence `
     -Expected @('1K', '2K', '4K') `
     -Name 'Gemini resolution options'
 
+Assert-Sequence `
+    -Actual (Get-OptionValues 'GEMINI_FLASH_LITE_RESOLUTION_OPTIONS') `
+    -Expected @('1K') `
+    -Name 'Gemini 3.1 Flash Lite resolution options'
+
 Assert-True `
     ($Html -notmatch 'gemini-2\.5-flash-image') `
     'Gemini 2.5 Flash Image must be removed from the application.'
@@ -71,6 +76,10 @@ Assert-True `
 Assert-True `
     ($Html -match '<option\s+value="gemini-3\.1-flash-image-preview">Gemini 3\.1 Image Fast</option>') `
     'Static model selector must include Gemini 3.1 Image Fast.'
+
+Assert-True `
+    ($Html -match '<option\s+value="gemini-3\.1-flash-lite-image">Gemini 3\.1 Flash Lite Image \(1K\)</option>') `
+    'Static model selector must include Gemini 3.1 Flash Lite Image.'
 
 Assert-True `
     ($Html -match '<option\s+value="gpt-image-2">GPT Image 2</option>') `
@@ -182,6 +191,11 @@ assertEqual(getAllowedImageModelKind('gemini-2.5-flash-image'), null, 'Gemini 2.
 assertEqual(getAllowedImageModelKind('gemini-3-pro-image-preview'), 'gemini3pro', 'Gemini 3 Pro image model is allowed');
 assertEqual(getAllowedImageModelKind('gemini-3.1-fast-image-preview'), 'gemini31fast', 'Gemini 3.1 Fast image model is allowed');
 assertEqual(getAllowedImageModelKind('gemini-3.1-flash-image-preview'), 'gemini31fast', 'Gemini 3.1 Flash image model is treated as fast');
+assertEqual(getAllowedImageModelKind('gemini-3.1-flash-lite-image'), 'gemini31flashlite', 'Gemini 3.1 Flash Lite Image is allowed');
+assertEqual(isGemini31FlashLiteImageModel('gemini-3.1-flash-lite-image'), true, 'Gemini 3.1 Flash Lite Image is detected separately');
+assertEqual(JSON.stringify(getResolutionOptionsForImageModel('gemini-3.1-flash-lite-image').map(option => option.value)), JSON.stringify(['1K']), 'Gemini 3.1 Flash Lite only exposes its supported 1K resolution');
+assertEqual(getDefaultResolutionForImageModel('gemini-3.1-flash-lite-image'), '1K', 'Gemini 3.1 Flash Lite defaults to 1K');
+assertEqual(resolveImageModelForRequest('openai', 'gemini-3.1-flash-lite-image', '1K'), 'gemini-3.1-flash-lite-image', 'Gemini 3.1 Flash Lite proxy requests keep the exact model id');
 assertEqual(getAllowedImageModelKind('gpt-image-2'), 'gptimage2', 'GPT Image 2 is allowed');
 assertEqual(getAllowedImageModelKind('gpt-image-2-pro'), 'gptimage2pro', 'GPT Image 2 Pro is allowed as a separate model');
 assertEqual(getAllowedImageModelKind('gemini-3.1-flash-image-preview-2k'), null, 'Resolution-suffixed Gemini image models are hidden');
