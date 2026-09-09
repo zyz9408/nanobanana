@@ -1400,6 +1400,13 @@
             return payload;
         }
 
+        function buildAntigravityImagePayload(prompt, refs, aspectRatio, resolution) {
+            const imagePrompt = 'Generate an image based on the description below. This is an image generation request, not a chat question. '
+                + 'For a number or short word, create a visual composition featuring it. '
+                + 'Use any attached reference images according to the description. Return the generated image.\n\nDescription:\n' + prompt;
+            return buildGeminiImagePayload(imagePrompt, refs, aspectRatio, resolution, { includeSystemInstruction: true });
+        }
+
         function buildProxyAspectRatioPrompt(prompt, aspectRatio) {
             if (!aspectRatio || aspectRatio === '1:1') return prompt;
             return `${prompt}\nAspect ratio requirement: ${aspectRatio}. Keep the final composition in this ratio.`;
@@ -2481,7 +2488,9 @@
                     apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
 
                     if (isGeminiImageModel(requestModel)) {
-                        const payload = buildGeminiImagePayload(prompt, refs, aspectRatio, resolution);
+                        const payload = task.apiProtocol === 'antigravity'
+                            ? buildAntigravityImagePayload(prompt, refs, aspectRatio, resolution)
+                            : buildGeminiImagePayload(prompt, refs, aspectRatio, resolution);
                         const response = await fetch(buildGeminiGenerateContentUrl(apiBaseUrl, requestModel), {
                             method: 'POST',
                             headers: {
@@ -2501,6 +2510,9 @@
                         finalBase64 = extractImageFromGeminiResponse(data);
                         if (!finalBase64) {
                             assertGeminiImageResponse(data);
+                            if (task.apiProtocol === 'antigravity') {
+                                throw new Error('模型本次只返回了文字，没有生成图片。请补充画面描述后重试，例如：生成一张写有“123”的彩色海报。');
+                            }
                             throw new Error(`Empty response from proxy image endpoint: ${summarizeImageResponse(data)}`);
                         }
                     } else {

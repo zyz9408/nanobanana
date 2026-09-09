@@ -33,7 +33,7 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#apiBaseUrl').isVisible(), false);
         assert.equal(await page.locator('#imageModelName').isVisible(), false);
         assert.match(await page.locator('#antigravityNotice').innerText(), /Gemini 3\.1 Flash Image/);
-        await page.locator('#prompt').fill('A yellow banana');
+        await page.locator('#prompt').fill('123');
         await page.locator('#genBtn').click();
         await page.waitForFunction(() => document.querySelector('#status').innerText.includes('Thinking'));
         await page.locator('#genBtn').click();
@@ -49,6 +49,9 @@ const { chromium } = require('playwright');
             assert.notEqual(new URL(request.url).hostname, 'manual.example');
             assert.match(request.headers.authorization, /^Bearer sk-ag-/);
             assert.equal(request.body.generationConfig.imageConfig.imageSize, '2K');
+            assert.match(request.body.contents[0].parts[0].text, /^Generate an image/);
+            assert.match(request.body.contents[0].parts[0].text, /Description:\n123$/);
+            assert.match(request.body.systemInstruction.parts[0].text, /Output ONLY the generated image/);
         }
         assert.equal(await page.locator('#resultImg').isVisible(), true);
         assert.equal(await page.evaluate(() => localStorage.getItem('gemini_api_key')), 'manual-test-key');
