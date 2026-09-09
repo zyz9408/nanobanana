@@ -850,23 +850,25 @@
                     <select id="apiProtocol" onchange="updateApiPlaceholders()">
                         <option value="google" selected>Google 原生 (Native)</option>
                         <option value="openai">第三方中转 (Proxy)</option>
+                        <option value="antigravity">反重力</option>
                     </select>
                 </div>
-                <div class="col">
+                <div class="col" id="apiBaseUrlField">
                     <label>Base URL (可选)</label>
                     <input type="text" id="apiBaseUrl" placeholder="默认: https://generativelanguage...">
                 </div>
             </div>
 
+            <p id="antigravityNotice" hidden>反重力已内置连接配置，输入提示词即可生图。<br>模型：Gemini 3.1 Flash Image</p>
             <!-- API Key -->
-            <div>
+            <div id="apiKeyField">
                 <div class="label-row" style="margin-bottom: 5px;">
                     <label id="apiKeyLabel" style="margin:0">API Key (自动保存)</label>
                 </div>
                 <input type="password" id="apiKey" placeholder="输入 API Key...">
             </div>
 
-            <div>
+            <div id="imageModelField">
                 <div class="label-row" style="margin-bottom: 5px;">
                     <label style="margin:0">Image Model</label>
                 </div>
@@ -1175,7 +1177,27 @@
     </div>
 
     <script>
+        // Static-site obfuscation only: the browser can recover these credentials.
+        // Do not persist decrypted credentials to localStorage or gallery records.
+        const ANTIGRAVITY_CONFIG = Object.freeze({"key":"yIc4RQawBZ2E7qlH4AgIsnHkLsvBE3hx41ucdcX51hw=","iv":"YeP9AupgDxAuXMs+","data":"gSa4AFiz5orJHRB2j3UU07EjAjubLz2IZW4OVLGH8rLC/eMKNtmxA88Ca1PvlVb71EgcmAVS1QifHYlyC87EnIM1YRUhuvP/8UkaaKpZf91ZoHryKT7hoVIcKkAKPlaHt8EKrro3n05iV4RlFPu0JfnIps8="});
+        async function getAntigravityConfig() {
+            if (!globalThis.crypto?.subtle) {
+                throw new Error('反重力模式需要 HTTPS、localhost 或本地文件环境，请通过这些方式打开网页。');
+            }
+            const decode = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
+            try {
+                const key = await crypto.subtle.importKey('raw', decode(ANTIGRAVITY_CONFIG.key), 'AES-GCM', false, ['decrypt']);
+                const plaintext = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: decode(ANTIGRAVITY_CONFIG.iv) }, key, decode(ANTIGRAVITY_CONFIG.data)
+                );
+                return JSON.parse(new TextDecoder().decode(plaintext));
+            } catch {
+                throw new Error('反重力内置配置读取失败，请重新加载页面。');
+            }
+        }
+
         const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
+        const ANTIGRAVITY_IMAGE_MODEL = "gemini-3.1-flash-image";
         const MAGIC_TOKEN_USAGE_URL = "https://magic666.top/api/usage/token/";
         const MAGIC_QUOTA_PER_UNIT = 500000;
         const IMAGE_QUEUE_MAX = 3;
@@ -1642,6 +1664,15 @@
 
         function updateApiPlaceholders() {
             const mode = apiProtocolInput.value;
+            const builtIn = mode === 'antigravity';
+            document.getElementById('apiBaseUrlField').hidden = builtIn;
+            document.getElementById('apiKeyField').hidden = builtIn;
+            document.getElementById('antigravityNotice').hidden = !builtIn;
+            document.getElementById('imageModelField').hidden = builtIn;
+            imageModelInput.disabled = builtIn;
+            apiBaseUrlInput.disabled = builtIn;
+            apiKeyInput.disabled = builtIn;
+            syncImageResolutionOptions();
             if (mode === 'openai') {
                 apiBaseUrlInput.placeholder = "例: https://api.yourproxy.com (Gemini 中转必填)";
                 apiKeyLabel.innerText = "API Key (Bearer)";
@@ -1653,7 +1684,8 @@
 
         function syncImageResolutionOptions() {
             const resolutionInput = document.getElementById('resolution');
-            const model = imageModelInput.value.trim() || DEFAULT_IMAGE_MODEL;
+            const model = apiProtocolInput.value === 'antigravity'
+                ? ANTIGRAVITY_IMAGE_MODEL : (imageModelInput.value.trim() || DEFAULT_IMAGE_MODEL);
             const optionSet = isGemini31FlashLiteImageModel(model) ? 'gemini-flash-lite' : (isGptImage2Model(model) ? 'gpt-image-2' : 'gemini');
             const options = getResolutionOptionsForImageModel(model);
             const currentValue = resolutionInput.value;
@@ -1676,7 +1708,7 @@
 
         function onImageModelChange() {
             localStorage.setItem("image_model_id", imageModelInput.value.trim());
-            if (isGptImage2Model(imageModelInput.value) && apiProtocolInput.value !== 'openai') {
+            if (isGptImage2Model(imageModelInput.value) && apiProtocolInput.value !== 'openai' && apiProtocolInput.value !== 'antigravity') {
                 apiProtocolInput.value = 'openai';
                 localStorage.setItem("api_protocol", 'openai');
                 updateApiPlaceholders();
@@ -2420,18 +2452,25 @@
         }
 
         async function runImageGenerationTask(task) {
-            const { apiKey, prompt, resolution, aspectRatio, model, refs } = task;
+            const { prompt, resolution, aspectRatio, model, refs } = task;
 
             toggleUI('image', true);
             document.getElementById('cancelBtn').style.display = 'block';
             updateImageQueueStatus("Thinking & Generating...", "#666");
 
-            const apiProtocol = document.getElementById('apiProtocol').value;
-            const requestModel = resolveImageModelForRequest(apiProtocol, model, resolution);
-            let apiBaseUrl = document.getElementById('apiBaseUrl').value.trim();
+            const apiProtocol = task.apiProtocol === 'antigravity' ? 'openai' : task.apiProtocol;
+            const requestModel = task.apiProtocol === 'antigravity'
+                ? ANTIGRAVITY_IMAGE_MODEL : resolveImageModelForRequest(apiProtocol, model, resolution);
 
             try {
-                imageAbortController = new AbortController();
+                const controller = new AbortController();
+                imageAbortController = controller;
+                const credentials = task.apiProtocol === 'antigravity'
+                    ? await getAntigravityConfig()
+                    : { apiKey: task.apiKey, baseUrl: task.apiBaseUrl };
+                const apiKey = credentials.apiKey;
+                let apiBaseUrl = credentials.baseUrl;
+                controller.signal.throwIfAborted();
                 let finalBase64 = null;
 
                 if (apiProtocol === 'openai') {
@@ -2570,11 +2609,14 @@
 
         // --- Generate Image (with queue, max 3) ---
         async function generate() {
-            const apiKey = document.getElementById('apiKey').value.trim();
+            const apiProtocol = apiProtocolInput.value;
+            const apiKey = apiProtocol === 'antigravity' ? '' : apiKeyInput.value.trim();
+            const apiBaseUrl = apiProtocol === 'antigravity' ? '' : apiBaseUrlInput.value.trim();
             let prompt = document.getElementById('prompt').value.trim();
             const aspectRatio = document.getElementById('aspectRatio').value;
             const rawModel = document.getElementById('imageModelName').value.trim() || DEFAULT_IMAGE_MODEL;
-            const model = normalizeAllowedImageModelForRequest(rawModel);
+            const model = apiProtocol === 'antigravity'
+                ? ANTIGRAVITY_IMAGE_MODEL : normalizeAllowedImageModelForRequest(rawModel);
             const visualStyle = document.getElementById('visualStyle').value;
             const renderText = document.getElementById('renderText').value.trim();
 
@@ -2585,7 +2627,7 @@
             syncImageResolutionOptions();
             const resolution = document.getElementById('resolution').value;
 
-            if (!apiKey) return alert("Please enter API Key");
+            if (apiProtocol !== 'antigravity' && !apiKey) return alert("Please enter API Key");
             if (!prompt && refImages.length === 0) return alert("Please enter prompt text");
 
             if (visualStyle) prompt = `[Style: ${visualStyle}] ` + prompt;
@@ -2596,6 +2638,8 @@
             }
 
             imageQueue.push({
+                apiProtocol,
+                apiBaseUrl,
                 apiKey,
                 prompt,
                 resolution,
@@ -2616,6 +2660,9 @@
         }
         // ================= Veo 视频生成 =================
         async function generateVideo() {
+            if (apiProtocolInput.value === 'antigravity') {
+                return alert("反重力模式目前用于图片生成。生成视频请切换到 Google 原生或第三方中转模式。");
+            }
             const apiKey = apiKeyInput.value.trim();
             const prompt = document.getElementById('videoPrompt').value.trim();
             const negPrompt = document.getElementById('negativePrompt').value.trim();
