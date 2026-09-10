@@ -4,7 +4,8 @@ Image generation keeps separate resolution contracts per model family.
 
 - The balance indicator reads token quota from `https://magic666.top/api/usage/token/` with `Authorization: Bearer <API Key>`, independent of the configured model Base URL. The trailing slash is intentional to avoid a redirect that can drop the `Authorization` header.
 - Magic/New API returns raw quota units. The balance indicator converts these using `500000` raw units per displayed `1.00`, matching magic666.top's `quota_per_unit` setting.
-- The image model selector is a static list of five visible choices: `Gemini 3 Image Pro`, `Gemini 3.1 Image Fast`, `Gemini 3.1 Flash Lite Image (1K)`, `GPT Image 2`, and `GPT Image 2 Pro (Native 4K)`. Image and video model selectors no longer expose remote model-reading buttons or call model-list endpoints.
+- The image model selector is a static list of seven visible choices: `Gemini 3 Image Pro`, `Gemini 3.1 Image Fast`, `Gemini 3.1 Flash Lite Image (1K)`, `GPT Image 2`, `GPT Image 2 Pro (Native 4K)`, `GPT Image 2.5 Flare（快速生成）`, and `GPT Image 2.5 Sunburst（精细编辑）`. Image and video model selectors no longer expose remote model-reading buttons or call model-list endpoints.
+- `gpt-image-2.5-flare` and `gpt-image-2.5-sunburst` retain their exact IDs in third-party requests and reuse the existing GPT image resolution mapping and `/v1/images/generations` payload. Their display characteristics follow the official [Flare](https://developers.openai.com/api/docs/models/gpt-image-2.5-flare) and [Sunburst](https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst) model descriptions. Availability still depends on the configured proxy supporting these model IDs.
 - `Gemini 3 Image Pro` (`gemini-3-pro-image-preview`) is the default image model. Removed or stale model selections fall back to this model.
 - Gemini image models normally keep the existing `1K`, `2K`, and `4K` values. `gemini-3.1-flash-lite-image` is restricted to its documented `1K` maximum and never exposes 2K/4K. The selected value is passed to `generationConfig.imageConfig.imageSize` together with the aspect ratio.
 - Gemini image models use the Gemini native `generateContent` payload in both Google native mode and third-party proxy mode. Proxy mode sends the API key through `Authorization: Bearer ...` and does not append a `?key=` query string.
@@ -15,7 +16,7 @@ Image generation keeps separate resolution contracts per model family.
 - Custom or restored `gpt-image-2` family sizes are accepted only when they are in that documented set.
 - The front-end resolution selector switches to the GPT values only when the selected image model is in the `gpt-image-2` family.
 - OpenAI-style image proxy requests for the `gpt-image-2` family send `size` and do not send the Gemini-style `aspect_ratio` field.
-- Selecting either GPT Image 2 model automatically switches the UI to the OpenAI-style third-party proxy protocol so it cannot be sent accidentally to a Google native endpoint.
+- Selecting any supported GPT Image 2 or 2.5 model automatically switches the UI to the OpenAI-style third-party proxy protocol. GPT image tasks also use that protocol at execution time if the UI protocol changes while they are queued.
 - Gemini proxy requests do not map `2K` and `4K` to alternate model names; the selected model stays in the path and the resolution stays in `generationConfig.imageConfig.imageSize`.
 
 Source: project gpt-image-2 Generations OpenAPI spec, MagicAPI GPT Image 2 Pro generation endpoint, MagicAPI Gemini native image generation spec, and the official Gemini 3.1 Flash Lite Image model documentation.

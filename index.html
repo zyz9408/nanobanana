@@ -878,6 +878,8 @@
                     <option value="gemini-3.1-flash-lite-image">Gemini 3.1 Flash Lite Image (1K)</option>
                     <option value="gpt-image-2">GPT Image 2</option>
                     <option value="gpt-image-2-pro">GPT Image 2 Pro (Native 4K)</option>
+                    <option value="gpt-image-2.5-flare">GPT Image 2.5 Flare（快速生成）</option>
+                    <option value="gpt-image-2.5-sunburst">GPT Image 2.5 Sunburst（精细编辑）</option>
                 </select>
             </div>
 
@@ -1264,6 +1266,12 @@
             if (id === 'gpt-image-2-pro') {
                 return 'gptimage2pro';
             }
+            if (id === 'gpt-image-2.5-flare') {
+                return 'gptimage25flare';
+            }
+            if (id === 'gpt-image-2.5-sunburst') {
+                return 'gptimage25sunburst';
+            }
             return null;
         }
 
@@ -1279,7 +1287,8 @@
         }
 
         function isGptImage2Model(model) {
-            return /^gpt-image-2(?:-pro)?$/.test(normalizeModelId(model));
+            // GPT Image 2.5 shares the existing GPT image proxy request contract.
+            return /^gpt-image-2(?:(?:-pro)?|\.5-(?:flare|sunburst))$/.test(normalizeModelId(model));
         }
 
         function isGemini31FlashLiteImageModel(model) {
@@ -2465,7 +2474,8 @@
             document.getElementById('cancelBtn').style.display = 'block';
             updateImageQueueStatus("Thinking & Generating...", "#666");
 
-            const apiProtocol = task.apiProtocol === 'antigravity' ? 'openai' : task.apiProtocol;
+            const apiProtocol = task.apiProtocol === 'antigravity' || isGptImage2Model(model)
+                ? 'openai' : task.apiProtocol;
             const requestModel = task.apiProtocol === 'antigravity'
                 ? ANTIGRAVITY_IMAGE_MODEL : resolveImageModelForRequest(apiProtocol, model, resolution);
 

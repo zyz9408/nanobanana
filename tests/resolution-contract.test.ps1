@@ -89,6 +89,14 @@ Assert-True `
     ($Html -match '<option\s+value="gpt-image-2-pro">GPT Image 2 Pro \(Native 4K\)</option>') `
     'Static model selector must include GPT Image 2 Pro with native 4K support.'
 
+Assert-True `
+    ($Html -match '<option\s+value="gpt-image-2\.5-flare">GPT Image 2\.5 Flare（快速生成）</option>') `
+    'Static model selector must include GPT Image 2.5 Flare with its speed characteristic.'
+
+Assert-True `
+    ($Html -match '<option\s+value="gpt-image-2\.5-sunburst">GPT Image 2\.5 Sunburst（精细编辑）</option>') `
+    'Static model selector must include GPT Image 2.5 Sunburst with its editing characteristic.'
+
 Assert-Sequence `
     -Actual (Get-OptionValues 'GPT_IMAGE_2_RESOLUTION_OPTIONS') `
     -Expected @('1K', '2K', '4K') `
@@ -121,7 +129,7 @@ Assert-True `
 
 Assert-True `
     ($Html -match "isGptImage2Model\(imageModelInput\.value\)\s*&&\s*apiProtocolInput\.value\s*!==\s*'openai'[\s\S]*?apiProtocolInput\.value\s*=\s*'openai'") `
-    'Selecting either GPT Image 2 model must route the UI to the OpenAI-style proxy protocol.'
+    'Selecting any supported GPT Image model must route the UI to the OpenAI-style proxy protocol.'
 
 Assert-True `
     ($Html -match 'const\s+MAGIC_TOKEN_USAGE_URL\s*=\s*"https://magic666\.top/api/usage/token/";') `
@@ -198,6 +206,19 @@ assertEqual(getDefaultResolutionForImageModel('gemini-3.1-flash-lite-image'), '1
 assertEqual(resolveImageModelForRequest('openai', 'gemini-3.1-flash-lite-image', '1K'), 'gemini-3.1-flash-lite-image', 'Gemini 3.1 Flash Lite proxy requests keep the exact model id');
 assertEqual(getAllowedImageModelKind('gpt-image-2'), 'gptimage2', 'GPT Image 2 is allowed');
 assertEqual(getAllowedImageModelKind('gpt-image-2-pro'), 'gptimage2pro', 'GPT Image 2 Pro is allowed as a separate model');
+for (const model of ['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst']) {
+    assertEqual(isAllowedImageModel(model), true, model + ' is allowed');
+    assertEqual(isGptImage2Model(model), true, model + ' uses the GPT image proxy contract');
+    assertEqual(resolveImageModelForRequest('openai', model, '4K'), model, model + ' keeps the exact request model id');
+    assertEqual(normalizeAllowedImageModelForRequest('models/' + model.toUpperCase()), model, model + ' normalizes without falling back to Gemini');
+    assertEqual(getDefaultResolutionForImageModel(model), '1K', model + ' defaults to 1K');
+    const payload = buildOpenAIImagePayload(model, 'prompt', '16:9', '4K');
+    assertEqual(payload.model, model, model + ' is preserved in the request body');
+    assertEqual(payload.size, '3840x2160', model + ' converts resolution into an OpenAI size');
+    assertEqual('aspect_ratio' in payload, false, model + ' omits the Gemini aspect_ratio field');
+}
+assertEqual(isGptImage2Model('gpt-image-2.5'), false, 'Unspecified GPT Image 2.5 variants are not accepted');
+assertEqual(isGptImage2Model('gpt-image-2.5-unknown'), false, 'Unknown GPT Image 2.5 variants are not accepted');
 assertEqual(getAllowedImageModelKind('gemini-3.1-flash-image-preview-2k'), null, 'Resolution-suffixed Gemini image models are hidden');
 assertEqual(resolveImageModelForRequest('openai', 'gpt-image-2', '2K'), 'gpt-image-2', 'GPT Image 2 request model stays exact and never falls through to Gemini');
 assertEqual(resolveImageModelForRequest('openai', 'gpt-image-2-pro', '4K'), 'gpt-image-2-pro', 'GPT Image 2 Pro request model stays exact');
