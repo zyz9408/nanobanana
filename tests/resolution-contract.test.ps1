@@ -208,23 +208,15 @@ assertEqual(getAllowedImageModelKind('gpt-image-2'), 'gptimage2', 'GPT Image 2 i
 assertEqual(getAllowedImageModelKind('gpt-image-2-pro'), 'gptimage2pro', 'GPT Image 2 Pro is allowed as a separate model');
 for (const model of ['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst']) {
     assertEqual(isAllowedImageModel(model), true, model + ' is allowed');
-    assertEqual(isGptImage2Model(model), true, model + ' uses GPT image resolution tiers');
-    assertEqual(isChatImageModel(model), true, model + ' uses the Chat Completions image route');
+    assertEqual(isGptImage2Model(model), true, model + ' uses the GPT image proxy contract');
     assertEqual(resolveImageModelForRequest('openai', model, '4K'), model, model + ' keeps the exact request model id');
     assertEqual(normalizeAllowedImageModelForRequest('models/' + model.toUpperCase()), model, model + ' normalizes without falling back to Gemini');
     assertEqual(getDefaultResolutionForImageModel(model), '1K', model + ' defaults to 1K');
-    const payload = buildChatImagePayload(model, 'prompt', [], '16:9', '4K');
+    const payload = buildOpenAIImagePayload(model, 'prompt', '16:9', '4K');
     assertEqual(payload.model, model, model + ' is preserved in the request body');
-    assertEqual(payload.stream, false, model + ' requests a complete chat response');
-    assertEqual(payload.messages[0].content[0].text.includes('3840x2160'), true, model + ' includes requested dimensions in the chat prompt');
-    assertEqual(payload.messages[0].content[0].text.endsWith('prompt'), true, model + ' preserves the user prompt');
-    assertEqual('response_format' in payload, false, model + ' does not send an Images API response format to chat');
-    assertEqual('size' in payload, false, model + ' does not send an Images API size field to chat');
-    const withRefs = buildChatImagePayload(model, 'edit', [{ data: 'aW1hZ2U=', mimeType: 'image/webp' }], '1:1', '1K');
-    assertEqual(withRefs.messages[0].content[1].image_url.url, 'data:image/webp;base64,aW1hZ2U=', model + ' passes references as chat image_url parts');
+    assertEqual(payload.size, '3840x2160', model + ' converts resolution into an OpenAI size');
+    assertEqual('aspect_ratio' in payload, false, model + ' omits the Gemini aspect_ratio field');
 }
-assertEqual(isChatImageModel('gpt-image-2'), false, 'GPT Image 2 retains its Images API route');
-assertEqual(isChatImageModel('gpt-image-2-pro'), false, 'GPT Image 2 Pro retains its Images API route');
 assertEqual(isGptImage2Model('gpt-image-2.5'), false, 'Unspecified GPT Image 2.5 variants are not accepted');
 assertEqual(isGptImage2Model('gpt-image-2.5-unknown'), false, 'Unknown GPT Image 2.5 variants are not accepted');
 assertEqual(getAllowedImageModelKind('gemini-3.1-flash-image-preview-2k'), null, 'Resolution-suffixed Gemini image models are hidden');

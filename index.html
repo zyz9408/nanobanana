@@ -1287,12 +1287,8 @@
         }
 
         function isGptImage2Model(model) {
-            // GPT Image 2 and 2.5 share resolution tiers and third-party protocol selection.
+            // GPT Image 2.5 shares the existing GPT image proxy request contract.
             return /^gpt-image-2(?:(?:-pro)?|\.5-(?:flare|sunburst))$/.test(normalizeModelId(model));
-        }
-
-        function isChatImageModel(model) {
-            return /^gpt-image-2\.5-(?:flare|sunburst)$/.test(normalizeModelId(model));
         }
 
         function isGemini31FlashLiteImageModel(model) {
@@ -1384,27 +1380,6 @@
                 });
             });
             return parts;
-        }
-
-        function buildChatImagePayload(requestModel, prompt, refs, aspectRatio, resolution) {
-            const size = normalizeGptImage2Resolution(resolution, aspectRatio);
-            const content = [{
-                type: 'text',
-                text: `Generate or edit an image according to the description and any reference images. Return the generated image.\nRequested aspect ratio: ${aspectRatio}. Requested image size: ${size}.\n\nDescription:\n${prompt}`
-            }];
-            refs.forEach(img => {
-                content.push({
-                    type: 'image_url',
-                    image_url: {
-                        url: img.data.startsWith('data:') ? img.data : `data:${img.mimeType || 'image/png'};base64,${img.data}`
-                    }
-                });
-            });
-            return {
-                model: requestModel,
-                messages: [{ role: 'user', content }],
-                stream: false
-            };
         }
 
         function buildGeminiImagePayload(prompt, refs, aspectRatio, resolution, options = {}) {
@@ -1588,18 +1563,6 @@
         }
 
         function extractImageFromProxyResponse(data) {
-            // Prefer explicit image attachments over links in accompanying chat text.
-            for (const choice of data?.choices || []) {
-                const message = choice?.message;
-                const attachedImage = extractImageFromAnyValue(message?.images);
-                if (attachedImage) return attachedImage;
-                const content = Array.isArray(message?.content) ? message.content : [];
-                for (const part of content) {
-                    if (part?.type !== 'image_url' && part?.type !== 'image' && !part?.b64_json) continue;
-                    const image = extractImageFromAnyValue(part);
-                    if (image) return image;
-                }
-            }
             const anyImage = extractImageFromAnyValue(data);
             if (anyImage) return anyImage;
 
@@ -2561,26 +2524,6 @@
                                 throw new Error('模型本次只返回了文字，没有生成图片。请补充画面描述后重试，例如：生成一张写有“123”的彩色海报。');
                             }
                             throw new Error(`Empty response from proxy image endpoint: ${summarizeImageResponse(data)}`);
-                        }
-                    } else if (isChatImageModel(requestModel)) {
-                        const payload = buildChatImagePayload(requestModel, prompt, refs, aspectRatio, resolution);
-                        const response = await fetch(`${apiBaseUrl.replace(/\/v1$/i, '')}/v1/chat/completions`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'Authorization': `Bearer ${apiKey}`
-                            },
-                            body: JSON.stringify(payload),
-                            signal: imageAbortController.signal
-                        });
-                        const data = await readJsonResponse(response);
-                        if (!response.ok || data.error) {
-                            throw new Error(getApiErrorMessage(data, response.status));
-                        }
-                        finalBase64 = extractImageFromProxyResponse(data);
-                        if (!finalBase64) {
-                            throw new Error('聊天生图接口未返回图片，请补充画面描述后重试。返回内容: ' + summarizeImageResponse(data));
                         }
                     } else {
                         const promptWithAspect = isGptImage2Model(requestModel) ? prompt : buildProxyAspectRatioPrompt(prompt, aspectRatio);
